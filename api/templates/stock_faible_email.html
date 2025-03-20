@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Alerte Stock Faible - ChezFlora</title>
+</head>
+<body style="font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f4f4;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <tr>
+            <td style="background-color: #FF5722; padding: 20px; text-align: center; border-top-left-radius: 8px; border-top-right-radius: 8px;">
+                <h1 style="color: #ffffff; margin: 0;">Alerte Stock Faible</h1>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 20px;">
+                <h2 style="color: #333333;">Attention, stock critique</h2>
+                <p style="color: #666666; font-size: 16px;">Bonjour {{ admin_name }},</p>
+                <p style="color: #666666; font-size: 16px;">Le produit suivant nécessite une action urgente :</p>
+                <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 10px; background-color: #f0f0f0;">Produit</td>
+                        <td style="padding: 10px;">{{ produit_nom }}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; background-color: #f0f0f0;">Stock actuel</td>
+                        <td style="padding: 10px; color: #FF5722;">{{ stock }}</td>
+                    </tr>
+                </table>
+                <p style="color: #666666; font-size: 14px;">Veuillez réapprovisionner ce produit dès que possible.</p>
+            </td>
+        </tr>
+        <tr>
+            <td style="background-color: #f4f4f4; padding: 10px; text-align: center; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px;">
+                <p style="color: #999999; font-size: 12px;">© 2025 ChezFlora. Tous droits réservés.</p>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
