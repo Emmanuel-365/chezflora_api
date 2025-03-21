@@ -27,7 +27,7 @@ SECRET_KEY = "django-insecure-+1okhughn%s^+=fkn2bd^*3c$%ozs&rg2&$i7$5e-(9@*)mt#^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost',]
+ALLOWED_HOSTS = ['localhost', 'chezflora-api.onrender.com']
 
 
 # Application definition
