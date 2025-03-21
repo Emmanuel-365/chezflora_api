@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Désinscription de l'atelier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            background-color: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        h2 {
+            color: #d9534f;
+        }
+        p {
+            color: #333;
+            font-size: 16px;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Désinscription confirmée</h2>
+        <p>Bonjour {{ client_name }},</p>
+        <p>Vous avez bien été désinscrit de l'atelier <strong>{{ atelier_titre }}</strong>.</p>
+        <p>Nous espérons vous voir à un autre atelier bientôt.</p>
+        <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+        <p class="footer">ChezFlora - Merci de votre confiance</p>
+    </div>
+</body>
+</html>

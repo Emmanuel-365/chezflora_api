@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -117,10 +118,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',  # Vite
-    'http://192.168.53.50:3000',
-]
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='').split(',')
 
 CORS_ALLOW_CREDENTIALS = True  # Pour les cookies/auth
 
@@ -146,20 +144,15 @@ TEMPLATES = [
 WSGI_APPLICATION = "chezflora_api.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
+# Base de données (exemple avec MySQL)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'chezflora_db',           # Nom de la base créée
-        'USER': 'chezflora_user',         # Utilisateur MySQL (ou 'root' si vous utilisez root)
-        'PASSWORD': 'chezflora', # Mot de passe de l'utilisateur
-        'HOST': 'localhost',              # Ou '127.0.0.1' si localhost ne fonctionne pas
-        'PORT': '3306',                   # Port par défaut de MySQL
-        'OPTIONS': {
-            'charset': 'utf8mb4',         # Pour supporter les caractères spéciaux
-        },
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST'),
+        'PORT': config('DB_PORT', default='3306'),
     }
 }
 
@@ -198,7 +191,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = "static/"
+# Static et Media
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -218,8 +215,8 @@ DEFAULT_FROM_EMAIL = 'ChezFlora <plazarecrute@gmail.com>'
 CONTACT_EMAIL = 'emmanuelscre1@gmail.com'
 
 # Celery Configuration
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_BROKER_URL = config('CELERY_BROKER_URL')
+CELERY_RESULT_BACKEND = config('CELERY_RESULT_BACKEND')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
@@ -251,6 +248,3 @@ CELERY_BEAT_SCHEDULE = {
 # Durée par défaut du cache (en secondes, ici 5 minutes)
 CACHE_TTL = 60 * 5  # 300 secondes
 
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

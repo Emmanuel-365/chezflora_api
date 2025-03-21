@@ -1,0 +1,1 @@
+web: gunicorn chezflora_api.wsgi:application --workers 2

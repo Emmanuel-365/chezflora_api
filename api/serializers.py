@@ -189,7 +189,7 @@ class ProduitSerializer(serializers.ModelSerializer):
 # Serializer pour Promotion
 class PromotionSerializer(serializers.ModelSerializer):
     categorie = CategorieSerializer(read_only=True)
-    categorie_id = serializers.PrimaryKeyRelatedField(queryset=Categorie.objects.all(), source='categorie', write_only=True, required=False)
+    categorie_id = serializers.PrimaryKeyRelatedField(queryset=Categorie.objects.all(), source='categorie', write_only=True, required=False, allow_null=True)
     produits = ProduitSerializer(many=True, read_only=True)  # Liste des produits en promotion
     produit_ids = serializers.PrimaryKeyRelatedField(queryset=Produit.objects.all(), many=True, source='produits', write_only=True, required=False)
 
@@ -306,7 +306,7 @@ class AbonnementSerializer(serializers.ModelSerializer):
     
 # Serializer pour Atelier
 class ParticipantSerializer(serializers.ModelSerializer):
-    utilisateur = serializers.StringRelatedField()
+    utilisateur = UtilisateurSerializer()
 
     class Meta:
         model = Participant

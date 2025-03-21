@@ -572,7 +572,13 @@ class PromotionViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
             return Promotion.objects.none()
-        return Promotion.objects.all()
+        if self.request.user.is_authenticated and self.request.user.role == 'admin':
+            return Promotion.objects.all()
+        return Promotion.objects.filter(
+            date_debut__lte=timezone.now(),
+            date_fin__gte=timezone.now(),
+            is_active=True
+        )
 
     @action(detail=True, methods=['get'], permission_classes=[])
     def produits_affectes(self, request, pk=None):
@@ -584,14 +590,36 @@ class PromotionViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     def perform_create(self, serializer):
+        # Sauvegarde initiale de la promotion
         instance = serializer.save()
-        if instance.categorie:
+        
+        # Récupérer les produit_ids envoyés dans la requête
+        produit_ids = self.request.data.get('produit_ids', [])
+        
+        # Si des produit_ids sont fournis, les utiliser en priorité
+        if produit_ids is not None:  # Vérifie si le champ est présent, même vide
+            instance.produits.set(produit_ids)
+        # Sinon, si une catégorie est spécifiée, appliquer les produits de la catégorie
+        elif instance.categorie:
             instance.produits.set(Produit.objects.filter(categorie=instance.categorie))
+        # Si ni produit_ids ni categorie, vider la liste (optionnel selon vos besoins)
+        else:
+            instance.produits.clear()
 
     def perform_update(self, serializer):
+        # Sauvegarde des modifications
         instance = serializer.save()
-        if instance.categorie:
-            instance.produits.set(Produit.objects.filter(categorie=instance.categorie))
+        
+        # Récupérer les produit_ids envoyés dans la requête
+        produit_ids = self.request.data.get('produit_ids', )
+        
+        # Si produit_ids est explicitement fourni (même vide), mettre à jour la liste
+        if produit_ids :
+            instance.produits.set(produit_ids)
+        # Sinon, si une catégorie est spécifiée et pas de produit_ids explicite, utiliser la catégorie
+        elif instance.categorie_id and instance.categorie_id is not None:
+            instance.produits.set(Produit.objects.filter(categorie=instance.categorie_id))
+        # Si ni produit_ids ni categorie, ne rien faire (conserver les produits existants)
 
 # ViewSet pour les commandes (authentification requise)
 class CommandeViewSet(viewsets.ModelViewSet):
@@ -1132,7 +1160,7 @@ class AtelierViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated()]
         return [AllowAny()]
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def s_inscrire(self, request, pk=None):
         user = request.user
         atelier = self.get_object()
@@ -1143,9 +1171,10 @@ class AtelierViewSet(viewsets.ModelViewSet):
         if atelier.places_disponibles <= 0:
             return Response({'error': 'Plus de places disponibles.'}, status=400)
 
-        if atelier.participants.filter(id=user.id).exists():
+        if atelier.participants.filter(utilisateur=user.id).exists():
             return Response({'error': 'Vous êtes déjà inscrit à cet atelier.'}, status=400)
-        atelier.participants.add(request.user)
+        participant = Participant.objects.create(utilisateur=request.user, atelier=atelier)
+        atelier.participants.add(participant)
         atelier.places_disponibles -= 1
         atelier.save()
         Paiement.objects.create(
@@ -1160,11 +1189,12 @@ class AtelierViewSet(viewsets.ModelViewSet):
         atelier = self.get_object()
         user = request.user
 
-        if not atelier.participants.filter(id=user.id).exists():
+        if not atelier.participants.filter(utilisateur=user.id).exists():
             return Response({'error': 'Vous n’êtes pas inscrit à cet atelier.'}, status=400)
 
         with transaction.atomic():
-            atelier.participants.remove(user)
+            participant=Participant.objects.get(utilisateur=user)
+            participant.delete()
             atelier.places_disponibles += 1
             atelier.save()
             
@@ -1181,7 +1211,7 @@ class AtelierViewSet(viewsets.ModelViewSet):
             subject = 'Désinscription atelier - ChezFlora'
             html_message = render_to_string('atelier_desinscription_email.html', {
                 'client_name': user.username,
-                'atelier_titre': atelier.titre,
+                'atelier_titre': atelier.nom,
             })
             plain_message = strip_tags(html_message)
             send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [user.email], html_message=html_message)
@@ -1214,7 +1244,7 @@ class AtelierViewSet(viewsets.ModelViewSet):
                 subject = 'Annulation de votre atelier - ChezFlora'
                 html_message = render_to_string('atelier_cancelled_email.html', {
                     'client_name': participant.username,
-                    'atelier_titre': atelier.titre,
+                    'atelier_titre': atelier.nom,
                     'atelier_date': atelier.date.strftime('%Y-%m-%d %H:%M'),
                     'raison': raison,
                 })
