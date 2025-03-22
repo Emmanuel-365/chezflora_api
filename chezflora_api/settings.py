@@ -118,8 +118,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOW_ALL_ORIGINS = True
-# CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='').split(',')
 
 CORS_ALLOW_CREDENTIALS = True  # Pour les cookies/auth
 
@@ -144,22 +143,28 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "chezflora_api.wsgi.application"
 
-import dj_database_url
-import os
+from decouple import config
 
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'chezflora_db',
-#         'USER': '',
-#         'PASSWORD': 'password',
-#         'HOST': 'ep-quiet-night-123456.us-east-2.aws.neon.tech',
-#         'PORT': '5432',
+#         'NAME': config('DB_NAME'),
+#         'USER': config('DB_USER'),
+#         'PASSWORD': config('DB_PASSWORD'),
+#         'HOST': config('DB_HOST'),
+#         'PORT': config('DB_PORT', default='5432', cast=int),
 #     }
 # }
 
 DATABASES = {
-    'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'chezflora_db',
+        'USER': 'neondb_owner',
+        'PASSWORD': 'npg_3Gc8QLlUVEPR',
+        'HOST': 'ep-lingering-heart-a5x1cyzz-pooler.us-east-2.aws.neon.tech',
+        'PORT': 5432,
+    }
 }
 
 

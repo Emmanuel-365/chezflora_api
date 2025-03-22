@@ -47,7 +47,7 @@ def backup_database():
     db_user = db_settings['USER']
     db_password = db_settings['PASSWORD']
     db_host = db_settings.get('HOST', 'localhost')
-    db_port = db_settings.get('PORT', '3306')
+    db_port = db_settings.get('PORT', '5432')
 
     # Dossier de sauvegarde
     backup_dir = os.path.join(settings.BASE_DIR, 'backups')
