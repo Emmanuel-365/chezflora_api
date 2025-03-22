@@ -118,7 +118,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='').split(',')
+# CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default='http://localhost:3000').split(',')
 
 CORS_ALLOW_CREDENTIALS = True  # Pour les cookies/auth
 
@@ -145,6 +145,17 @@ WSGI_APPLICATION = "chezflora_api.wsgi.application"
 
 import dj_database_url
 import os
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'chezflora_db',
+#         'USER': '',
+#         'PASSWORD': 'password',
+#         'HOST': 'ep-quiet-night-123456.us-east-2.aws.neon.tech',
+#         'PORT': '5432',
+#     }
+# }
 
 DATABASES = {
     'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
