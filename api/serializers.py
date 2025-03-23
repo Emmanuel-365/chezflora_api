@@ -277,7 +277,7 @@ class RealisationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Realisation
-        fields = ['id', 'service', 'service_id', 'titre', 'description', 'photos', 'date', 'admin', 'admin_id', 'is_active', 'date_creation', 'photo_ids']
+        fields = ['id', 'service', 'service_id', 'titre', 'description', 'photos', 'date', 'admin', 'is_active', 'date_creation', 'photo_ids']
         read_only_fields = ['date_creation']
 
 # Serializer pour Abonnement
