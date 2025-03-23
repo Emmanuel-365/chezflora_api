@@ -242,6 +242,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'api.tasks.backup_media_files',
         'schedule': 86400.0,
     },
+    'check-abonnements-every-hour': {
+        'task': 'api.tasks.generer_commandes_abonnements',
+        'schedule': 3600.0,  # Vérifie toutes les heures
+    },
 }
 
 

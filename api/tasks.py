@@ -1,5 +1,6 @@
+from decimal import Decimal
 from celery import shared_task
-from .models import Abonnement, Produit, Utilisateur
+from .models import Abonnement, Paiement, Produit, Utilisateur
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
@@ -7,10 +8,44 @@ from django.utils.html import strip_tags
 
 @shared_task
 def generer_commandes_abonnements():
-    abonnements = Abonnement.objects.filter(is_active=True, prochaine_livraison__lte=timezone.now())
+    now = timezone.now()
+    abonnements = Abonnement.objects.filter(is_active=True, prochaine_livraison__lte=now)
     for abonnement in abonnements:
-        abonnement.generer_commande()
-    return f"{len(abonnements)} commandes générées"
+        commande = abonnement.generer_commande()
+        if commande:
+            # Envoyer une notification au client
+            send_mail(
+                'Nouvelle livraison planifiée - ChezFlora',
+                f'Votre commande #{commande.id} est prête pour livraison.',
+                'ChezFlora <plazarecrute@gmail.com>',
+                [abonnement.client.email],
+            )
+
+@shared_task
+def facturer_abonnements():
+    now = timezone.now()
+    abonnements = Abonnement.objects.filter(
+        is_active=True,
+        paiement_statut='paye_mensuel',
+        prochaine_facturation__lte=now
+    )
+    for abonnement in abonnements:
+        montant = abonnement.calculer_prix() / Decimal('1')  # Mensuel ou hebdo
+        Paiement.objects.create(
+            abonnement=abonnement,
+            type_transaction='abonnement',
+            montant=montant,
+            client=abonnement.client,
+            statut='simule'
+        )
+        abonnement.prochaine_facturation = abonnement.calculer_prochaine_facturation()
+        abonnement.save()
+        send_mail(
+            'Facture mensuelle - ChezFlora',
+            f'Paiement de {montant} FCFA pour votre abonnement {abonnement.type}.',
+            'ChezFlora <plazarecrute@gmail.com>',
+            [abonnement.client.email]
+        )
 
 @shared_task
 def notifier_stock_faible():

@@ -258,64 +258,49 @@ class AbonnementProduit(models.Model):
         return f"{self.quantite} x {self.produit.nom} dans Abonnement #{self.abonnement.id}"
 
 class Abonnement(models.Model):
-    TYPES = [
-        ('mensuel', 'Mensuel'),
-        ('hebdomadaire', 'Hebdomadaire'),
-        ('annuel', 'Annuel'),
+    TYPES = [('mensuel', 'Mensuel'), ('hebdomadaire', 'Hebdomadaire'), ('annuel', 'Annuel')]
+    PAIEMENT_STATUTS = [
+        ('non_paye', 'Non payé'),
+        ('paye_complet', 'Payé en une fois'),
+        ('paye_mensuel', 'Payé mensuellement'),
     ]
-    client = models.ForeignKey('Utilisateur', on_delete=models.CASCADE, related_name='abonnements')
+    client = models.ForeignKey('Utilisateur', on_delete=models.CASCADE)
     type = models.CharField(max_length=20, choices=TYPES)
-    # Suppression de : produits = models.ManyToManyField(Produit, related_name='abonnements')
-    # La relation est maintenant gérée via AbonnementProduit
     date_debut = models.DateTimeField()
     date_fin = models.DateTimeField(null=True, blank=True)
-    prix = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    prix = models.DecimalField(max_digits=10, decimal_places=2)  # Coût total ou mensuel
+    paiement_statut = models.CharField(max_length=20, choices=PAIEMENT_STATUTS, default='non_paye')
+    prochaine_facturation = models.DateTimeField(null=True, blank=True)  # Nouvelle date de facturation
     is_active = models.BooleanField(default=True)
-    date_creation = models.DateTimeField(auto_now_add=True)
-    date_mise_a_jour = models.DateTimeField(auto_now=True)
     prochaine_livraison = models.DateTimeField(null=True, blank=True)
 
-    def __str__(self):
-        return f"{self.type} - {self.client}"
-
-    @property
-    def produits(self):
-        """Propriété pour accéder aux produits via AbonnementProduit."""
-        return self.abonnement_produits.all()
-
     def calculer_prix(self):
-        """Calcule et met à jour le prix total basé sur les produits et leurs quantités."""
         total = sum(Decimal(str(item.produit.prix)) * item.quantite for item in self.abonnement_produits.all())
         if self.type == 'hebdomadaire':
-            total *= Decimal('4')  # 4 fois par mois
+            total *= Decimal('4')  # 4 livraisons par mois
         elif self.type == 'annuel':
-            total *= Decimal('12') * Decimal('0.9')  # Réduction de 10%
-        self.prix = total
-        self.save()
+            total *= Decimal('12') * Decimal('0.9')  # 12 mois avec 10% de réduction
         return total
 
     def calculer_prochaine_livraison(self):
-        if self.type == 'hebdomadaire':
-            return self.prochaine_livraison + timedelta(weeks=1) if self.prochaine_livraison else self.date_debut + timedelta(weeks=1)
-        elif self.type == 'mensuel':
-            return self.prochaine_livraison + timedelta(days=30) if self.prochaine_livraison else self.date_debut + timedelta(days=30)
-        elif self.type == 'annuel':
-            return self.prochaine_livraison + timedelta(days=365) if self.prochaine_livraison else self.date_debut + timedelta(days=365)
-        return None
+        if not self.prochaine_livraison:
+            return self.date_debut
+        delta = {'hebdomadaire': timedelta(days=7), 'mensuel': timedelta(days=30), 'annuel': timedelta(days=30)}.get(self.type)
+        return self.prochaine_livraison + delta
+
+    def calculer_prochaine_facturation(self):
+        if self.type == 'annuel':
+            return None  # Pas de facturation récurrente
+        delta = {'hebdomadaire': timedelta(days=30), 'mensuel': timedelta(days=30)}.get(self.type)
+        return (self.prochaine_facturation or self.date_debut) + delta
 
     def generer_commande(self):
-        if not self.is_active or (self.date_fin and timezone.now() > self.date_fin):
+        if not self.is_active or (self.date_fin and timezone.now() > self.date_fin) or self.paiement_statut == 'non_paye':
             return None
-        from .models import Commande, LigneCommande, Paiement  # Import local pour éviter les dépendances circulaires
-        commande = Commande.objects.create(client=self.client, total=0, statut='en_attente_paiement')
-        total = Decimal('0.00')
+        total = sum(Decimal(str(item.produit.prix)) * item.quantite for item in self.abonnement_produits.all())
+        commande = Commande.objects.create(client=self.client, total=total, statut='en_attente_livraison')
         for abo_produit in self.abonnement_produits.all():
-            prix = abo_produit.produit.prix
-            total += prix * abo_produit.quantite
-            LigneCommande.objects.create(commande=commande, produit=abo_produit.produit, quantite=abo_produit.quantite, prix_unitaire=prix)
-        commande.total = total
-        commande.save()
-        Paiement.objects.create(commande=commande, type_transaction='abonnement', montant=total, client=self.client)
+            LigneCommande.objects.create(commande=commande, produit=abo_produit.produit, quantite=abo_produit.quantite, prix_unitaire=abo_produit.produit.prix)
         self.prochaine_livraison = self.calculer_prochaine_livraison()
         self.save()
         return commande

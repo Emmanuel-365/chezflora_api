@@ -1023,20 +1023,55 @@ class AbonnementViewSet(viewsets.ModelViewSet):
         return Abonnement.objects.filter(client=self.request.user)
 
     def perform_create(self, serializer):
-        # Sauvegarde l'abonnement avec les produits et quantités via le serializer
-        abonnement = serializer.save(client=self.request.user)
-        # Le calcul du prix et la définition de prochaine_livraison sont gérés dans le serializer
+        with transaction.atomic():
+            abonnement = serializer.save(client=self.request.user)
+            abonnement.prix = abonnement.calculer_prix()
+            abonnement.prochaine_livraison = abonnement.date_debut
+            abonnement.prochaine_facturation = abonnement.date_debut
 
-        # Envoyer email de confirmation
-        subject = 'Confirmation de votre abonnement - ChezFlora'
-        html_message = render_to_string('commande_confirmation_email.html', {
-            'client_name': abonnement.client.username,
-            'commande_id': abonnement.id,
-            'total': str(abonnement.prix),  # Convertir Decimal en chaîne
-            'date': abonnement.date_debut.strftime('%Y-%m-%d %H:%M:%S'),
-        })
-        plain_message = strip_tags(html_message)
-        send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [abonnement.client.email], html_message=html_message)
+            # Paiement initial
+            montant = abonnement.prix if abonnement.type == 'annuel' else abonnement.calculer_prix() / Decimal('12' if abonnement.type == 'annuel' else '1')
+            paiement = Paiement.objects.create(
+                abonnement=abonnement,
+                type_transaction='abonnement',
+                montant=montant,
+                client=self.request.user,
+                statut='simule'  # À remplacer par un vrai paiement (Stripe)
+            )
+            abonnement.paiement_statut = 'paye_complet' if abonnement.type == 'annuel' else 'paye_mensuel'
+            abonnement.save()
+
+            # Email de confirmation
+            send_mail(
+                'Confirmation de votre abonnement - ChezFlora',
+                f'Votre abonnement {abonnement.type} a été créé. Montant: {montant} FCFA.',
+                'ChezFlora <plazarecrute@gmail.com>',
+                [self.request.user.email]
+            )
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def facturer(self, request, pk=None):
+        abonnement = self.get_object()
+        if not abonnement.is_active or not abonnement.prochaine_facturation or timezone.now() < abonnement.prochaine_facturation:
+            return Response({'error': 'Pas de facturation due'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        montant = abonnement.calculer_prix() / Decimal('12' if abonnement.type == 'annuel' else '1')
+        paiement = Paiement.objects.create(
+            abonnement=abonnement,
+            type_transaction='abonnement',
+            montant=montant,
+            client=abonnement.client,
+            statut='simule'
+        )
+        abonnement.prochaine_facturation = abonnement.calculer_prochaine_facturation()
+        abonnement.save()
+        send_mail(
+            'Facture de votre abonnement - ChezFlora',
+            f'Paiement de {montant} FCFA pour votre abonnement {abonnement.type}.',
+            'ChezFlora <plazarecrute@gmail.com>',
+            [abonnement.client.email]
+        )
+        return Response({'status': 'Facturé', 'paiement_id': paiement.id})
 
     def perform_update(self, serializer):
         # Mise à jour de l'abonnement
