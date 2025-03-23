@@ -269,7 +269,7 @@ class RealisationSerializer(serializers.ModelSerializer):
     service = ServiceSerializer(read_only=True)
     service_id = serializers.PrimaryKeyRelatedField(queryset=Service.objects.all(), source='service', write_only=True)
     admin = UtilisateurSerializer(read_only=True)
-    admin_id = serializers.PrimaryKeyRelatedField(queryset=Utilisateur.objects.filter(role='admin'), source='admin', write_only=True, allow_null=True)
+    admin_id = serializers.PrimaryKeyRelatedField(queryset=Utilisateur.objects.filter(role='admin'), source='admin', write_only=True, allow_null=True, required=False)
     photos = PhotoSerializer(many=True, read_only=True)
     photo_ids = serializers.PrimaryKeyRelatedField(
         queryset=Photo.objects.all(), many=True, write_only=True, required=False
