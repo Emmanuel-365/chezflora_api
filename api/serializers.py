@@ -294,13 +294,6 @@ class AbonnementProduitSerializer(serializers.ModelSerializer):
 # Serializer pour Abonnement
 class AbonnementSerializer(serializers.ModelSerializer):
     abonnement_produits = AbonnementProduitSerializer(many=True, read_only=True)
-    produits = ProduitSerializer(many=True, read_only=True)
-    produit_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Produit.objects.all(),
-        many=True,
-        source='produits',
-        write_only=True
-    )
     produit_quantites = serializers.ListField(
         child=serializers.DictField(
             child=serializers.IntegerField(),
