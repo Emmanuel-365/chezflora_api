@@ -1025,12 +1025,8 @@ class AbonnementViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         with transaction.atomic():
             abonnement = serializer.save(client=self.request.user)
-            # Le prix est déjà calculé dans create, mais on peut vérifier ici si besoin
-            if not abonnement.prix:
-                abonnement.prix = abonnement.calculer_prix()
+            # Le prix et prochaine_livraison sont déjà gérés dans create
             abonnement.prochaine_facturation = abonnement.date_debut
-            abonnement.save()
-
             # Paiement initial
             montant = abonnement.prix if abonnement.type == 'annuel' else abonnement.prix / Decimal('12' if abonnement.type == 'annuel' else '1')
             paiement = Paiement.objects.create(
