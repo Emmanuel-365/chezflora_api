@@ -318,7 +318,8 @@ class AbonnementSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         produit_quantites = validated_data.pop('produit_quantites')
-        abonnement = Abonnement.objects.create(client=self.context['request'].user, **validated_data)
+        # Pas besoin de passer client ici, il vient de validated_data via serializer.save
+        abonnement = Abonnement.objects.create(**validated_data)
         for item in produit_quantites:
             produit_id = item.get('produit_id')
             quantite = item.get('quantite', 1)
