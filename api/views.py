@@ -452,7 +452,7 @@ class ProduitViewSet(viewsets.ModelViewSet):
         if getattr(self, 'swagger_fake_view', False):
             return Produit.objects.none()
         if self.request.user.is_authenticated and self.request.user.role == 'admin':
-            return Produit.objects.all()  # Admins voient tous les produits, actifs ou non
+            return Produit.objects.all().order_by('id')  # Admins voient tous les produits, actifs ou non
         return Produit.objects.filter(is_active=True)
 
     def get_permissions(self):
