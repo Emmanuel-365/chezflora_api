@@ -1025,9 +1025,11 @@ class AbonnementViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         with transaction.atomic():
             abonnement = serializer.save(client=self.request.user)
+            # Calculer et sauvegarder le prix immédiatement après création
             abonnement.prix = abonnement.calculer_prix()
             abonnement.prochaine_livraison = abonnement.date_debut
             abonnement.prochaine_facturation = abonnement.date_debut
+            abonnement.save()  # Sauvegarde avec le prix calculé
 
             # Paiement initial
             montant = abonnement.prix if abonnement.type == 'annuel' else abonnement.calculer_prix() / Decimal('12' if abonnement.type == 'annuel' else '1')
@@ -1036,12 +1038,11 @@ class AbonnementViewSet(viewsets.ModelViewSet):
                 type_transaction='abonnement',
                 montant=montant,
                 client=self.request.user,
-                statut='simule'  # À remplacer par un vrai paiement (Stripe)
+                statut='simule'
             )
             abonnement.paiement_statut = 'paye_complet' if abonnement.type == 'annuel' else 'paye_mensuel'
             abonnement.save()
 
-            # Email de confirmation
             send_mail(
                 'Confirmation de votre abonnement - ChezFlora',
                 f'Votre abonnement {abonnement.type} a été créé. Montant: {montant} FCFA.',
