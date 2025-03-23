@@ -318,16 +318,20 @@ class AbonnementSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         produit_quantites = validated_data.pop('produit_quantites')
-        # Pas besoin de passer client ici, il vient de validated_data via serializer.save
-        abonnement = Abonnement.objects.create(**validated_data)
+        # Créer un objet temporaire pour calculer le prix
+        abonnement = Abonnement(**validated_data)  # Ne pas sauvegarder encore
+        abonnement.client = self.context['request'].user  # Assigner client manuellement si nécessaire
         for item in produit_quantites:
             produit_id = item.get('produit_id')
             quantite = item.get('quantite', 1)
             produit = Produit.objects.get(id=produit_id)
             AbonnementProduit.objects.create(abonnement=abonnement, produit=produit, quantite=quantite)
-        abonnement.calculer_prix()
-        abonnement.prochaine_livraison = abonnement.date_debut
-        abonnement.save()
+        # Calculer le prix avant sauvegarde
+        validated_data['prix'] = abonnement.calculer_prix()
+        validated_data['prochaine_livraison'] = abonnement.date_debut
+        # Maintenant créer l'objet avec le prix inclus
+        abonnement = Abonnement.objects.create(**validated_data)
+        abonnement.save()  # Pas strictement nécessaire ici, mais conservé pour cohérence
         return abonnement
 
     def update(self, instance, validated_data):
