@@ -269,7 +269,7 @@ class RealisationSerializer(serializers.ModelSerializer):
     service = ServiceSerializer(read_only=True)
     service_id = serializers.PrimaryKeyRelatedField(queryset=Service.objects.all(), source='service', write_only=True)
     admin = UtilisateurSerializer(read_only=True)
-    admin_id = serializers.PrimaryKeyRelatedField(queryset=Utilisateur.objects.filter(role='admin'), source='admin', write_only=True)
+    admin_id = serializers.PrimaryKeyRelatedField(queryset=Utilisateur.objects.filter(role='admin'), source='admin', write_only=True, allow_null=True)
     photos = PhotoSerializer(many=True, read_only=True)
     photo_ids = serializers.PrimaryKeyRelatedField(
         queryset=Photo.objects.all(), many=True, write_only=True, required=False
@@ -277,7 +277,7 @@ class RealisationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Realisation
-        fields = ['id', 'service', 'service_id', 'titre', 'description', 'photos', 'date', 'admin', 'is_active', 'date_creation', 'photo_ids']
+        fields = ['id', 'service', 'service_id', 'titre', 'description', 'photos', 'date', 'admin', 'admin_id', 'is_active', 'date_creation', 'photo_ids']
         read_only_fields = ['date_creation']
 
 # Serializer pour Abonnement
