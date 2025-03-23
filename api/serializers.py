@@ -312,7 +312,7 @@ class AbonnementSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if data.get('date_fin') and data['date_debut'] >= data['date_fin']:
             raise serializers.ValidationError("La date de début doit être antérieure à la date de fin.")
-        if not data.get('produits'):
+        if not data.get('produit_quantites'):
             raise serializers.ValidationError("Un abonnement doit inclure au moins un produit.")
         return data
     
