@@ -2,7 +2,7 @@ from django.utils import timezone
 from decimal import Decimal
 from rest_framework import serializers
 from .models import (
-    Utilisateur, Categorie, Produit, Promotion, Commande, LigneCommande, Photo,
+    AbonnementProduit, Utilisateur, Categorie, Produit, Promotion, Commande, LigneCommande, Photo,
     Panier, PanierProduit, Adresse, Devis, Service, Realisation, Abonnement,
     Atelier, Article, Commentaire, Parametre, Paiement, OTP, Wishlist, Participant
 )
@@ -280,8 +280,20 @@ class RealisationSerializer(serializers.ModelSerializer):
         fields = ['id', 'service', 'service_id', 'titre', 'description', 'photos', 'date', 'admin', 'admin_id', 'is_active', 'date_creation', 'photo_ids']
         read_only_fields = ['date_creation']
 
+
+class AbonnementProduitSerializer(serializers.ModelSerializer):
+    produit = ProduitSerializer(read_only=True)
+    produit_id = serializers.PrimaryKeyRelatedField(
+        queryset=Produit.objects.all(), source='produit', write_only=True
+    )
+
+    class Meta:
+        model = AbonnementProduit
+        fields = ['produit', 'produit_id', 'quantite']
+
 # Serializer pour Abonnement
 class AbonnementSerializer(serializers.ModelSerializer):
+    abonnement_produits = AbonnementProduitSerializer(many=True, read_only=True)
     produits = ProduitSerializer(many=True, read_only=True)
     produit_ids = serializers.PrimaryKeyRelatedField(
         queryset=Produit.objects.all(),
@@ -289,11 +301,18 @@ class AbonnementSerializer(serializers.ModelSerializer):
         source='produits',
         write_only=True
     )
+    produit_quantites = serializers.ListField(
+        child=serializers.DictField(
+            child=serializers.IntegerField(),
+            required=True
+        ),
+        write_only=True
+    )
     prix = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = Abonnement
-        fields = ['id', 'type', 'date_debut', 'date_fin', 'produits', 'produit_ids', 
+        fields = ['id', 'type', 'date_debut', 'date_fin', 'produits', 'produit_ids', 'abonnement_produits', 'produits_quantites',
                   'prix', 'is_active', 'date_creation', 'date_mise_a_jour', 'prochaine_livraison']
         read_only_fields = ['prix', 'date_creation', 'date_mise_a_jour', 'prochaine_livraison']
 
@@ -303,6 +322,38 @@ class AbonnementSerializer(serializers.ModelSerializer):
         if not data.get('produits'):
             raise serializers.ValidationError("Un abonnement doit inclure au moins un produit.")
         return data
+    
+    def create(self, validated_data):
+        produit_quantites = validated_data.pop('produit_quantites')
+        abonnement = Abonnement.objects.create(client=self.context['request'].user, **validated_data)
+        for item in produit_quantites:
+            produit_id = item.get('produit_id')
+            quantite = item.get('quantite', 1)
+            produit = Produit.objects.get(id=produit_id)
+            AbonnementProduit.objects.create(abonnement=abonnement, produit=produit, quantite=quantite)
+        abonnement.calculer_prix()
+        abonnement.prochaine_livraison = abonnement.date_debut
+        abonnement.save()
+        return abonnement
+
+    def update(self, instance, validated_data):
+        produit_quantites = validated_data.pop('produit_quantites', None)
+        instance.type = validated_data.get('type', instance.type)
+        instance.date_debut = validated_data.get('date_debut', instance.date_debut)
+        instance.date_fin = validated_data.get('date_fin', instance.date_fin)
+        instance.is_active = validated_data.get('is_active', instance.is_active)
+        instance.save()
+
+        if produit_quantites is not None:
+            instance.abonnement_produits.all().delete()  # Supprime les anciennes relations
+            for item in produit_quantites:
+                produit_id = item.get('produit_id')
+                quantite = item.get('quantite', 1)
+                produit = Produit.objects.get(id=produit_id)
+                AbonnementProduit.objects.create(abonnement=instance, produit=produit, quantite=quantite)
+            instance.calculer_prix()
+
+        return instance
     
 # Serializer pour Atelier
 class ParticipantSerializer(serializers.ModelSerializer):

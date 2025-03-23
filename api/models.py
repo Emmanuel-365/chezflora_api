@@ -243,33 +243,58 @@ class Realisation(models.Model):
     def __str__(self):
         return f"{self.titre} ({self.service})"
 
-# Modèle Abonnement
+# Nouvelle table intermédiaire
+class AbonnementProduit(models.Model):
+    abonnement = models.ForeignKey('Abonnement', on_delete=models.CASCADE, related_name='abonnement_produits')
+    produit = models.ForeignKey('Produit', on_delete=models.CASCADE)
+    quantite = models.IntegerField(validators=[MinValueValidator(1)], default=1)
+
+    class Meta:
+        unique_together = ('abonnement', 'produit')
+        verbose_name = "Produit d'abonnement"
+        verbose_name_plural = "Produits d'abonnement"
+
+    def __str__(self):
+        return f"{self.quantite} x {self.produit.nom} dans Abonnement #{self.abonnement.id}"
+
 class Abonnement(models.Model):
     TYPES = [
         ('mensuel', 'Mensuel'),
         ('hebdomadaire', 'Hebdomadaire'),
         ('annuel', 'Annuel'),
     ]
-    client = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='abonnements', limit_choices_to={'role': 'client'})
+    client = models.ForeignKey('Utilisateur', on_delete=models.CASCADE, related_name='abonnements')
     type = models.CharField(max_length=20, choices=TYPES)
-    produits = models.ManyToManyField(Produit, related_name='abonnements', help_text="Produits inclus dans l'abonnement")
+    # Suppression de : produits = models.ManyToManyField(Produit, related_name='abonnements')
+    # La relation est maintenant gérée via AbonnementProduit
     date_debut = models.DateTimeField()
     date_fin = models.DateTimeField(null=True, blank=True)
     prix = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
     is_active = models.BooleanField(default=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_mise_a_jour = models.DateTimeField(auto_now=True)
-    prochaine_livraison = models.DateTimeField(null=True, blank=True)  # Suivi de la prochaine commande automatique
-
-    class Meta:
-        verbose_name = "Abonnement"
-        verbose_name_plural = "Abonnements"
+    prochaine_livraison = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.type} - {self.client}"
 
+    @property
+    def produits(self):
+        """Propriété pour accéder aux produits via AbonnementProduit."""
+        return self.abonnement_produits.all()
+
+    def calculer_prix(self):
+        """Calcule et met à jour le prix total basé sur les produits et leurs quantités."""
+        total = sum(Decimal(str(item.produit.prix)) * item.quantite for item in self.abonnement_produits.all())
+        if self.type == 'hebdomadaire':
+            total *= Decimal('4')  # 4 fois par mois
+        elif self.type == 'annuel':
+            total *= Decimal('12') * Decimal('0.9')  # Réduction de 10%
+        self.prix = total
+        self.save()
+        return total
+
     def calculer_prochaine_livraison(self):
-        """Calcule la date de la prochaine livraison en fonction du type."""
         if self.type == 'hebdomadaire':
             return self.prochaine_livraison + timedelta(weeks=1) if self.prochaine_livraison else self.date_debut + timedelta(weeks=1)
         elif self.type == 'mensuel':
@@ -279,27 +304,18 @@ class Abonnement(models.Model):
         return None
 
     def generer_commande(self):
-        """Génère une commande automatique pour cet abonnement."""
         if not self.is_active or (self.date_fin and timezone.now() > self.date_fin):
             return None
+        from .models import Commande, LigneCommande, Paiement  # Import local pour éviter les dépendances circulaires
         commande = Commande.objects.create(client=self.client, total=0, statut='en_attente_paiement')
         total = Decimal('0.00')
-        for produit in self.produits.all():
-            prix = produit.prix
-            promotions = produit.promotions.filter(is_active=True, date_debut__lte=timezone.now(), date_fin__gte=timezone.now())
-            if promotions.exists():
-                reduction = max(p.reduction for p in promotions)
-                prix *= (1 - reduction)
-            LigneCommande.objects.create(commande=commande, produit=produit, quantite=1, prix_unitaire=prix)
-            total += prix
+        for abo_produit in self.abonnement_produits.all():
+            prix = abo_produit.produit.prix
+            total += prix * abo_produit.quantite
+            LigneCommande.objects.create(commande=commande, produit=abo_produit.produit, quantite=abo_produit.quantite, prix_unitaire=prix)
         commande.total = total
         commande.save()
-        Paiement.objects.create(
-            commande=commande,
-            type_transaction='abonnement',
-            montant=total,
-            client=self.client
-        )
+        Paiement.objects.create(commande=commande, type_transaction='abonnement', montant=total, client=self.client)
         self.prochaine_livraison = self.calculer_prochaine_livraison()
         self.save()
         return commande

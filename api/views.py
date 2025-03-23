@@ -1013,7 +1013,7 @@ class AbonnementViewSet(viewsets.ModelViewSet):
     filterset_class = AbonnementFilter
     search_fields = ['client__username']
     ordering_fields = ['date_debut', 'prix']
-    pagination_class = StandardResultsSetPagination  # Ajouté
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
@@ -1023,28 +1023,11 @@ class AbonnementViewSet(viewsets.ModelViewSet):
         return Abonnement.objects.filter(client=self.request.user)
 
     def perform_create(self, serializer):
-        # Récupérer les produit_ids avant sauvegarde
-        produit_ids = self.request.data.get('produit_ids', [])
-        produits = Produit.objects.filter(id__in=produit_ids)
-        
-        # Calculer le prix en fonction du type
-        base_price = sum(produit.prix for produit in produits)
-        type_abonnement = self.request.data.get('type')
-        if type_abonnement == 'hebdomadaire':
-            prix = base_price * Decimal('4')  # 4 livraisons par mois
-        elif type_abonnement == 'mensuel':
-            prix = base_price  # 1 livraison par mois
-        elif type_abonnement == 'annuel':
-            prix = base_price / Decimal('12')  # 1/12 par mois
-        else:
-            prix = base_price  # Défaut
+        # Sauvegarde l'abonnement avec les produits et quantités via le serializer
+        abonnement = serializer.save(client=self.request.user)
+        # Le calcul du prix et la définition de prochaine_livraison sont gérés dans le serializer
 
-        # Sauvegarder avec le prix calculé
-        abonnement = serializer.save(client=self.request.user, prix=prix)
-        abonnement.prochaine_livraison = abonnement.date_debut
-        abonnement.save()
-
-        # Envoyer email
+        # Envoyer email de confirmation
         subject = 'Confirmation de votre abonnement - ChezFlora'
         html_message = render_to_string('commande_confirmation_email.html', {
             'client_name': abonnement.client.username,
@@ -1054,6 +1037,11 @@ class AbonnementViewSet(viewsets.ModelViewSet):
         })
         plain_message = strip_tags(html_message)
         send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [abonnement.client.email], html_message=html_message)
+
+    def perform_update(self, serializer):
+        # Mise à jour de l'abonnement
+        abonnement = serializer.save()
+        # Si les produits/quantités ont changé, le prix est recalculé dans le serializer
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def generer_commande_manuelle(self, request, pk=None):
@@ -1066,14 +1054,14 @@ class AbonnementViewSet(viewsets.ModelViewSet):
             html_message = render_to_string('commande_confirmation_email.html', {
                 'client_name': commande.client.username,
                 'commande_id': commande.id,
-                'total': commande.total,
+                'total': str(commande.total),  # Convertir Decimal en chaîne
                 'date': commande.date.strftime('%Y-%m-%d %H:%M:%S'),
             })
             plain_message = strip_tags(html_message)
             send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [commande.client.email], html_message=html_message)
             return Response({'status': 'Commande générée', 'commande_id': commande.id}, status=status.HTTP_201_CREATED)
         return Response({'error': 'Abonnement inactif ou expiré'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def cancel(self, request, pk=None):
         abonnement = self.get_object()
@@ -1085,7 +1073,7 @@ class AbonnementViewSet(viewsets.ModelViewSet):
         with transaction.atomic():
             abonnement.is_active = False
             abonnement.save()
-            
+
             # Gérer le paiement (suppression si simulé, remboursement partiel si effectué)
             paiement = Paiement.objects.filter(abonnement=abonnement, type_transaction='abonnement').first()
             if paiement:
