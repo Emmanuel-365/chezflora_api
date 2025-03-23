@@ -274,6 +274,8 @@ class Abonnement(models.Model):
     is_active = models.BooleanField(default=True)
     prochaine_livraison = models.DateTimeField(null=True, blank=True)
     date_creation = models.DateField(auto_now=True)
+    date_mise_a_jour = models.DateField(auto_now=True)
+
 
     def calculer_prix(self):
         total = sum(Decimal(str(item.produit.prix)) * item.quantite for item in self.abonnement_produits.all())
