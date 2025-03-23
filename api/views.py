@@ -1033,7 +1033,6 @@ class AbonnementViewSet(viewsets.ModelViewSet):
                 abonnement=abonnement,
                 type_transaction='abonnement',
                 montant=montant,
-                client=self.request.user,
                 statut='simule'
             )
             abonnement.paiement_statut = 'paye_complet' if abonnement.type == 'annuel' else 'paye_mensuel'
@@ -1057,8 +1056,7 @@ class AbonnementViewSet(viewsets.ModelViewSet):
             abonnement=abonnement,
             type_transaction='abonnement',
             montant=montant,
-            client=abonnement.client,
-            statut='simule'
+            statut='simule'  # No 'client' here
         )
         abonnement.prochaine_facturation = abonnement.calculer_prochaine_facturation()
         abonnement.save()
