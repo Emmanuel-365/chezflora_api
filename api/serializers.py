@@ -318,13 +318,21 @@ class AbonnementSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         produit_quantites = validated_data.pop('produit_quantites')
-        abonnement = Abonnement.objects.create(**validated_data)  # prix=0.00 par défaut
+        # Ajouter client à validated_data si pas déjà présent
+        validated_data['client'] = self.context['request'].user
+        # Créer l'abonnement sans sauvegarder immédiatement
+        abonnement = Abonnement(**validated_data)
+        # Ajouter les produits pour calculer le prix
         for item in produit_quantites:
             produit_id = item.get('produit_id')
             quantite = item.get('quantite', 1)
             produit = Produit.objects.get(id=produit_id)
             AbonnementProduit.objects.create(abonnement=abonnement, produit=produit, quantite=quantite)
-        # Le prix sera mis à jour dans perform_create
+        # Calculer et assigner le prix avant sauvegarde
+        validated_data['prix'] = abonnement.calculer_prix()
+        validated_data['prochaine_livraison'] = abonnement.date_debut
+        # Sauvegarder avec toutes les valeurs
+        abonnement = Abonnement.objects.create(**validated_data)
         return abonnement
 
     def update(self, instance, validated_data):
@@ -336,16 +344,17 @@ class AbonnementSerializer(serializers.ModelSerializer):
         instance.save()
 
         if produit_quantites is not None:
-            instance.abonnement_produits.all().delete()  # Supprime les anciennes relations
+            instance.abonnement_produits.all().delete()
             for item in produit_quantites:
                 produit_id = item.get('produit_id')
                 quantite = item.get('quantite', 1)
                 produit = Produit.objects.get(id=produit_id)
                 AbonnementProduit.objects.create(abonnement=instance, produit=produit, quantite=quantite)
-            instance.calculer_prix()
+            instance.prix = instance.calculer_prix()
+            instance.save()
 
         return instance
-    
+
 # Serializer pour Atelier
 class ParticipantSerializer(serializers.ModelSerializer):
     utilisateur = UtilisateurSerializer()

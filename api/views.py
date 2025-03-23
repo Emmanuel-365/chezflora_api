@@ -1025,14 +1025,14 @@ class AbonnementViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         with transaction.atomic():
             abonnement = serializer.save(client=self.request.user)
-            # Calculer et sauvegarder le prix immédiatement après création
-            abonnement.prix = abonnement.calculer_prix()
-            abonnement.prochaine_livraison = abonnement.date_debut
+            # Le prix est déjà calculé dans create, mais on peut vérifier ici si besoin
+            if not abonnement.prix:
+                abonnement.prix = abonnement.calculer_prix()
             abonnement.prochaine_facturation = abonnement.date_debut
-            abonnement.save()  # Sauvegarde avec le prix calculé
+            abonnement.save()
 
             # Paiement initial
-            montant = abonnement.prix if abonnement.type == 'annuel' else abonnement.calculer_prix() / Decimal('12' if abonnement.type == 'annuel' else '1')
+            montant = abonnement.prix if abonnement.type == 'annuel' else abonnement.prix / Decimal('12' if abonnement.type == 'annuel' else '1')
             paiement = Paiement.objects.create(
                 abonnement=abonnement,
                 type_transaction='abonnement',
@@ -1098,67 +1098,67 @@ class AbonnementViewSet(viewsets.ModelViewSet):
             return Response({'status': 'Commande générée', 'commande_id': commande.id}, status=status.HTTP_201_CREATED)
         return Response({'error': 'Abonnement inactif ou expiré'}, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
-    def cancel(self, request, pk=None):
-        abonnement = self.get_object()
-        if abonnement.client != request.user and request.user.role != 'admin':
-            return Response({'error': 'Non autorisé'}, status=status.HTTP_403_FORBIDDEN)
-        if not abonnement.is_active:
-            return Response({'error': 'Abonnement déjà inactif'}, status=status.HTTP_400_BAD_REQUEST)
+        @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+        def cancel(self, request, pk=None):
+            abonnement = self.get_object()
+            if abonnement.client != request.user and request.user.role != 'admin':
+                return Response({'error': 'Non autorisé'}, status=status.HTTP_403_FORBIDDEN)
+            if not abonnement.is_active:
+                return Response({'error': 'Abonnement déjà inactif'}, status=status.HTTP_400_BAD_REQUEST)
 
-        with transaction.atomic():
-            abonnement.is_active = False
-            abonnement.save()
+            with transaction.atomic():
+                abonnement.is_active = False
+                abonnement.save()
 
-            # Gérer le paiement (suppression si simulé, remboursement partiel si effectué)
-            paiement = Paiement.objects.filter(abonnement=abonnement, type_transaction='abonnement').first()
-            if paiement:
-                if paiement.statut == 'simule':
-                    paiement.delete()
-                elif paiement.statut == 'effectue':
-                    # Remboursement partiel basé sur le temps restant (simplifié ici)
-                    paiement.statut = 'rembourse_partiel'
-                    paiement.save()
+                # Gérer le paiement (suppression si simulé, remboursement partiel si effectué)
+                paiement = Paiement.objects.filter(abonnement=abonnement, type_transaction='abonnement').first()
+                if paiement:
+                    if paiement.statut == 'simule':
+                        paiement.delete()
+                    elif paiement.statut == 'effectue':
+                        # Remboursement partiel basé sur le temps restant (simplifié ici)
+                        paiement.statut = 'rembourse_partiel'
+                        paiement.save()
 
-            # Notifier
-            subject = 'Annulation de votre abonnement - ChezFlora'
-            html_message = render_to_string('abonnement_annulation_email.html', {
-                'client_name': abonnement.client.username,
-                'abonnement_id': abonnement.id,
-            })
-            plain_message = strip_tags(html_message)
-            send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [abonnement.client.email], html_message=html_message)
+                # Notifier
+                subject = 'Annulation de votre abonnement - ChezFlora'
+                html_message = render_to_string('abonnement_annulation_email.html', {
+                    'client_name': abonnement.client.username,
+                    'abonnement_id': abonnement.id,
+                })
+                plain_message = strip_tags(html_message)
+                send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [abonnement.client.email], html_message=html_message)
 
-        return Response({'status': 'Abonnement annulé'}, status=status.HTTP_200_OK)
+            return Response({'status': 'Abonnement annulé'}, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
-    def stats(self, request):
-        days = request.query_params.get('days', 30)
-        try:
-            days = int(days)
-            last_period = timezone.now() - timedelta(days=days)
-        except ValueError:
-            days = 30
-            last_period = timezone.now() - timedelta(days=30)
+        @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
+        def stats(self, request):
+            days = request.query_params.get('days', 30)
+            try:
+                days = int(days)
+                last_period = timezone.now() - timedelta(days=days)
+            except ValueError:
+                days = 30
+                last_period = timezone.now() - timedelta(days=30)
 
-        total_abonnements = Abonnement.objects.count()
-        active_abonnements = Abonnement.objects.filter(is_active=True).count()
-        revenus = Abonnement.objects.filter(is_active=True).aggregate(total=Sum('prix'))['total'] or Decimal('0.00')
-        abonnements_by_type = (
-            Abonnement.objects
-            .filter(date_debut__gte=last_period, is_active=True)
-            .values('type')
-            .annotate(total=Count('id'))
-            .order_by('-total')
-        )
+            total_abonnements = Abonnement.objects.count()
+            active_abonnements = Abonnement.objects.filter(is_active=True).count()
+            revenus = Abonnement.objects.filter(is_active=True).aggregate(total=Sum('prix'))['total'] or Decimal('0.00')
+            abonnements_by_type = (
+                Abonnement.objects
+                .filter(date_debut__gte=last_period, is_active=True)
+                .values('type')
+                .annotate(total=Count('id'))
+                .order_by('-total')
+            )
 
-        stats_data = {
-            'total_abonnements': total_abonnements,
-            'active_abonnements': active_abonnements,
-            'revenus': str(revenus),
-            'abonnements_by_type': list(abonnements_by_type),
-        }
-        return Response(stats_data)
+            stats_data = {
+                'total_abonnements': total_abonnements,
+                'active_abonnements': active_abonnements,
+                'revenus': str(revenus),
+                'abonnements_by_type': list(abonnements_by_type),
+            }
+            return Response(stats_data)
 
 # ViewSet pour les ateliers (public par défaut)
 class AtelierViewSet(viewsets.ModelViewSet):
