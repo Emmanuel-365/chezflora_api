@@ -302,6 +302,7 @@ class AbonnementSerializer(serializers.ModelSerializer):
         write_only=True
     )
     prix = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    paiement_statut = serializers.Field(read_only=True, allow_null=True, required=False)
 
     class Meta:
         model = Abonnement
