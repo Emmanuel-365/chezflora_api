@@ -312,7 +312,7 @@ class AbonnementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Abonnement
-        fields = ['id', 'type', 'date_debut', 'date_fin', 'produits', 'produit_ids', 'abonnement_produits', 'produit_quantites',
+        fields = ['id', 'type', 'date_debut', 'date_fin', 'abonnement_produits', 'produit_quantites',
                   'prix', 'is_active', 'date_creation', 'date_mise_a_jour', 'prochaine_livraison']
         read_only_fields = ['prix', 'date_creation', 'date_mise_a_jour', 'prochaine_livraison']
 
