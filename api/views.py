@@ -117,12 +117,17 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     filterset_class = UtilisateurFilter
     search_fields = ['username', 'email']
     ordering_fields = ['username', 'date_creation']
-    pagination_class = StandardResultsSetPagination  # Ajout de la pagination
+    pagination_class = StandardResultsSetPagination
 
     def get_permissions(self):
+        # Actions publiques sans authentification
         if self.action in ['register', 'verify_otp', 'resend_otp', 'reset_password']:
-            return [AllowAny()]  # Actions publiques
-        return super().get_permissions()
+            return [AllowAny()]
+        # Les utilisateurs authentifiés peuvent accéder à 'me' et mettre à jour leur propre profil
+        elif self.action in ['me', 'update'] and self.request.method in ['GET', 'PUT', 'PATCH']:
+            return [IsAuthenticated()]
+        # Les autres actions nécessitent des permissions admin
+        return [IsAdminUser()]
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
@@ -289,7 +294,6 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         total_ateliers = Atelier.objects.count()
         active_ateliers = Atelier.objects.filter(is_active=True).count()
         cancelled_ateliers = Atelier.objects.filter(is_active=False).count()
-        # Correction : Compter les participants au lieu de sommer un champ 'count'
         total_participants = Atelier.objects.aggregate(total=Count('participants'))['total'] or 0
 
         total_payments = Paiement.objects.count()
@@ -348,16 +352,27 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Réservé aux admins'}, status=status.HTTP_403_FORBIDDEN)
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save(is_active=True, is_banned=False)  # Actif par défaut, pas d’OTP
+        user = serializer.save(is_active=True, is_banned=False)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        """Mise à jour d’un utilisateur par un admin."""
-        if request.user.role != 'admin':
-            return Response({'error': 'Réservé aux admins'}, status=status.HTTP_403_FORBIDDEN)
+        """Mise à jour d’un utilisateur par lui-même ou par un admin."""
         instance = self.get_object()
+
+        # Vérifie si l'utilisateur est un admin ou modifie son propre profil
+        if request.user.role != 'admin' and request.user.id != instance.id:
+            return Response({'error': 'Vous ne pouvez modifier que votre propre profil'}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
+
+        # Si l'utilisateur n'est pas admin, limiter les champs modifiables
+        if request.user.role != 'admin':
+            allowed_fields = {'username', 'email'}  # Champs modifiables par l'utilisateur
+            for field in request.data.keys():
+                if field not in allowed_fields:
+                    return Response({'error': f'Vous ne pouvez pas modifier le champ {field}'}, status=status.HTTP_403_FORBIDDEN)
+
         serializer.save()
         return Response(serializer.data)
 
@@ -379,7 +394,6 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             days = 7
             last_period = timezone.now() - timedelta(days=7)
 
-        # Inscriptions par jour
         registrations_by_day = (
             Utilisateur.objects
             .filter(date_creation__gte=last_period)
@@ -389,7 +403,6 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             .order_by('date')
         )
 
-        # Connexions par jour
         logins_by_day = (
             Utilisateur.objects
             .filter(last_login__gte=last_period)
@@ -410,7 +423,8 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             ],
         }
         return Response(stats_data)
-
+    
+    
 # ViewSet pour les catégories (public par défaut)
 class CategorieViewSet(viewsets.ModelViewSet):
     """
