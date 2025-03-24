@@ -232,19 +232,33 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
+from celery.schedules import crontab
 # Celery Beat Configuration
 CELERY_BEAT_SCHEDULE = {
-    'backup-database-every-day': {
-        'task': 'api.tasks.backup_database',
-        'schedule': 86400.0,
-    },
-    'backup-media-every-day': {
-        'task': 'api.tasks.backup_media_files',
-        'schedule': 86400.0,
-    },
-    'check-abonnements-every-hour': {
+    # Génération des commandes d'abonnements toutes les heures
+    'generer-commandes-abonnements-toutes-les-heures': {
         'task': 'api.tasks.generer_commandes_abonnements',
-        'schedule': 3600.0,  # Vérifie toutes les heures
+        'schedule': 3600.0,  # Toutes les heures (en secondes)
+    },
+    # Facturation des abonnements tous les jours à minuit
+    'facturer-abonnements-quotidien': {
+        'task': 'api.tasks.facturer_abonnements',
+        'schedule': crontab(hour=0, minute=0),  # Tous les jours à 00:00
+    },
+    # Notification de stock faible tous les jours à 8h00
+    'notifier-stock-faible-quotidien': {
+        'task': 'api.tasks.notifier_stock_faible',
+        'schedule': crontab(hour=8, minute=0),  # Tous les jours à 08:00
+    },
+    # Sauvegarde de la base de données tous les jours à 2h00
+    'backup-database-quotidien': {
+        'task': 'api.tasks.backup_database',
+        'schedule': crontab(hour=2, minute=0),  # Tous les jours à 02:00
+    },
+    # Sauvegarde des fichiers médias tous les jours à 3h00
+    'backup-media-quotidien': {
+        'task': 'api.tasks.backup_media_files',
+        'schedule': crontab(hour=3, minute=0),  # Tous les jours à 03:00
     },
 }
 
