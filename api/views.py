@@ -676,8 +676,8 @@ class PromotionViewSet(viewsets.ModelViewSet):
         if produit_ids:  # Vérifie si le champ est présent, même vide
             instance.produits.set(produit_ids)
         # Sinon, si une catégorie est spécifiée, appliquer les produits de la catégorie
-        elif instance.categorie:
-            instance.produits.set(Produit.objects.filter(categorie=instance.categorie))
+        elif instance.categorie_id and instance.categorie_id is not None:
+            instance.produits.set(Produit.objects.filter(categorie=instance.categorie_id))
         # Si ni produit_ids ni categorie, vider la liste (optionnel selon vos besoins)
         else:
             instance.produits.clear()
