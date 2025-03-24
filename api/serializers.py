@@ -172,13 +172,20 @@ class ProduitSerializer(serializers.ModelSerializer):
     def get_prix_reduit(self, obj):
         promotions = obj.promotions.filter(
             is_active=True,
-            date_debut__lte=timezone.now(),  # Utilisez timezone.now() ici
-            date_fin__gte=timezone.now()     # Utilisez timezone.now() ici
+            date_debut__lte=timezone.now(),
+            date_fin__gte=timezone.now()
         )
-        if promotions.exists():
-            reduction = max(p.reduction for p in promotions)
-            return float(obj.prix) * float(1 - reduction)
-        return float(obj.prix)
+        
+        # Si aucune promotion active, on retourne le prix d'origine
+        if not promotions.exists():
+            return float(obj.prix)
+
+        # Appliquer chaque réduction successivement
+        prix_reduit = float(obj.prix)
+        for promotion in promotions:
+            prix_reduit *= (1 - float(promotion.reduction))
+
+        return round(prix_reduit, 2)  # Arrondir à 2 décimales pour plus de précision
     
     def to_representation(self, instance):
         representation = super().to_representation(instance)
