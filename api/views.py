@@ -668,11 +668,12 @@ class PromotionViewSet(viewsets.ModelViewSet):
         # Sauvegarde initiale de la promotion
         instance = serializer.save()
         
+        
         # Récupérer les produit_ids envoyés dans la requête
         produit_ids = self.request.data.get('produit_ids', [])
         
         # Si des produit_ids sont fournis, les utiliser en priorité
-        if produit_ids is not None:  # Vérifie si le champ est présent, même vide
+        if produit_ids:  # Vérifie si le champ est présent, même vide
             instance.produits.set(produit_ids)
         # Sinon, si une catégorie est spécifiée, appliquer les produits de la catégorie
         elif instance.categorie:
@@ -686,7 +687,7 @@ class PromotionViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
         
         # Récupérer les produit_ids envoyés dans la requête
-        produit_ids = self.request.data.get('produit_ids', )
+        produit_ids = self.request.data.get('produit_ids', [])
         
         # Si produit_ids est explicitement fourni (même vide), mettre à jour la liste
         if produit_ids :
