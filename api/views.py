@@ -123,10 +123,10 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         # Actions publiques sans authentification
         if self.action in ['register', 'verify_otp', 'resend_otp', 'reset_password']:
             return [AllowAny()]
-        # Les utilisateurs authentifiés peuvent accéder à 'me' et mettre à jour leur propre profil
-        elif self.action in ['me', 'update', 'change_password'] and self.request.method in ['GET', 'PUT', 'PATCH']:
+        # Actions accessibles aux utilisateurs authentifiés
+        elif self.action in ['me', 'update', 'change_password']:
             return [IsAuthenticated()]
-        # Les autres actions nécessitent des permissions admin
+        # Actions réservées aux admins
         return [IsAdminUser()]
 
     def get_queryset(self):
