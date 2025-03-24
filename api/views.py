@@ -124,7 +124,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         if self.action in ['register', 'verify_otp', 'resend_otp', 'reset_password']:
             return [AllowAny()]
         # Les utilisateurs authentifiés peuvent accéder à 'me' et mettre à jour leur propre profil
-        elif self.action in ['me', 'update'] and self.request.method in ['GET', 'PUT', 'PATCH']:
+        elif self.action in ['me', 'update', 'change_password'] and self.request.method in ['GET', 'PUT', 'PATCH']:
             return [IsAuthenticated()]
         # Les autres actions nécessitent des permissions admin
         return [IsAdminUser()]
