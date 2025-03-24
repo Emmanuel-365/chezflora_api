@@ -303,7 +303,7 @@ class AbonnementSerializer(serializers.ModelSerializer):
     )
     prix = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     paiement_statut = serializers.ReadOnlyField(allow_null=True, required=False)
-    client = UtilisateurSerializer()
+    client = UtilisateurSerializer(read_only=True)
     class Meta:
         model = Abonnement
         fields = ['id', 'type', 'date_debut', 'date_fin', 'abonnement_produits', 'produit_quantites', 'client', 'prochaine_facturation',
