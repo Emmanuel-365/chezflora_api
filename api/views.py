@@ -41,7 +41,7 @@ from .filters import (
 from .exceptions import BannedUserException
 from django.conf import settings
 from django.db.models.functions import TruncDay
-
+from django.contrib.auth.hashers import check_password, make_password
 
 class PhotoViewSet(viewsets.ModelViewSet):
     queryset = Photo.objects.all()
@@ -265,6 +265,51 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         user.save()
         return Response({'status': 'Utilisateur banni'}, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def change_password(self, request):
+        """Permet à un utilisateur authentifié de changer son mot de passe."""
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+        confirm_password = request.data.get('confirm_password')
+
+        # Vérification des champs requis
+        if not all([old_password, new_password, confirm_password]):
+            return Response(
+                {'error': 'Tous les champs (old_password, new_password, confirm_password) sont requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Vérification de l’ancien mot de passe
+        if not check_password(old_password, user.password):
+            return Response(
+                {'error': 'L’ancien mot de passe est incorrect'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Vérification que le nouveau mot de passe et la confirmation correspondent
+        if new_password != confirm_password:
+            return Response(
+                {'error': 'Le nouveau mot de passe et la confirmation ne correspondent pas'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Optionnel : Ajouter des règles de validation pour le nouveau mot de passe
+        if len(new_password) < 8:
+            return Response(
+                {'error': 'Le nouveau mot de passe doit comporter au moins 8 caractères'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mise à jour du mot de passe
+        user.password = make_password(new_password)
+        user.save()
+
+        return Response(
+            {'status': 'Mot de passe modifié avec succès'},
+            status=status.HTTP_200_OK
+        )
+
     @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
     def dashboard(self, request):
         days = request.query_params.get('days', 7)
@@ -424,7 +469,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
         }
         return Response(stats_data)
     
-    
+
 # ViewSet pour les catégories (public par défaut)
 class CategorieViewSet(viewsets.ModelViewSet):
     """
