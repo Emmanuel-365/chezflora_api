@@ -39,4 +39,5 @@ urlpatterns = [
     path('resend-otp/', UtilisateurViewSet.as_view({'post': 'resend_otp'}), name='resend-otp'),
     path('ban-user/', UtilisateurViewSet.as_view({'post': 'ban_user'}), name='ban-user'),
     path('parametres/public/', ParametreViewSet.as_view({'get': 'public'}), name='parametres-public'),
+    path('change-password/', UtilisateurViewSet.as_view({'post': 'change_password'}), name='change-password'),
 ]
