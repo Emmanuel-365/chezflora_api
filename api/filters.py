@@ -9,10 +9,11 @@ from django.utils import timezone
 class UtilisateurFilter(filters.FilterSet):
     role = filters.ChoiceFilter(choices=Utilisateur._meta.get_field('role').choices)
     is_active = filters.BooleanFilter()
+    is_banned = filters.BooleanFilter()
 
     class Meta:
         model = Utilisateur
-        fields = ['username', 'email', 'role', 'is_active']
+        fields = ['username', 'email', 'role', 'is_active', 'is_banned']
 
 # Filtre pour Categorie
 class CategorieFilter(filters.FilterSet):
