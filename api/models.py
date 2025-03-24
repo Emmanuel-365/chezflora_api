@@ -31,6 +31,7 @@ class Photo(models.Model):
     realisation = models.ForeignKey('Realisation', on_delete=models.CASCADE, related_name='photos', null=True, blank=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Photo"
         verbose_name_plural = "Photos"
 
@@ -59,6 +60,7 @@ class Utilisateur(AbstractUser):
     is_banned = models.BooleanField(default=False)  # Nouveau champ pour le bannissement
 
     class Meta:
+        ordering=['id']
         verbose_name = "Utilisateur"
         verbose_name_plural = "Utilisateurs"
 
@@ -85,6 +87,7 @@ class OTP(models.Model):
     is_used = models.BooleanField(default=False)
 
     class Meta:
+        ordering=['id']
         verbose_name = "OTP"
         verbose_name_plural = "OTPs"
 
@@ -108,6 +111,7 @@ class Categorie(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Catégorie"
         verbose_name_plural = "Catégories"
 
@@ -129,6 +133,7 @@ class Produit(models.Model):
     # La relation avec Photo est gérée via related_name='photos'
 
     class Meta:
+        ordering=['id']
         verbose_name = "Produit"
         verbose_name_plural = "Produits"
 
@@ -151,6 +156,7 @@ class Promotion(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Promotion"
         verbose_name_plural = "Promotions"
 
@@ -168,6 +174,7 @@ class Panier(models.Model):
     date_mise_a_jour = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Panier"
         verbose_name_plural = "Paniers"
 
@@ -182,6 +189,7 @@ class PanierProduit(models.Model):
     date_ajout = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering=['id']
         unique_together = ('panier', 'produit')  # Un produit unique par panier
         verbose_name = "Produit du panier"
         verbose_name_plural = "Produits du panier"
@@ -206,6 +214,7 @@ class Devis(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Devis"
         verbose_name_plural = "Devis"
 
@@ -223,6 +232,7 @@ class Service(models.Model):
     # La relation avec Photo est gérée via related_name='photos'
 
     class Meta:
+        ordering=['id']
         verbose_name = "Service"
         verbose_name_plural = "Services"
 
@@ -243,6 +253,7 @@ class Realisation(models.Model):
     # La relation avec Photo est gérée via related_name='photos'
 
     class Meta:
+        ordering=['id']
         verbose_name = "Réalisation"
         verbose_name_plural = "Réalisations"
 
@@ -313,6 +324,9 @@ class Abonnement(models.Model):
         self.prochaine_livraison = self.calculer_prochaine_livraison()
         self.save()
         return commande
+    
+    class Meta:
+        ordering=['id']
 
 # Modèle Atelier
 class Atelier(models.Model):
@@ -335,6 +349,7 @@ class Participant(models.Model):
     statut = models.CharField(max_length=20, choices=[('inscrit', 'Inscrit'), ('present', 'Présent'), ('annule', 'Annulé')], default='inscrit')
 
     class Meta:
+        ordering=['id']
         unique_together = ('atelier', 'utilisateur')
 
     def __str__(self):
@@ -352,6 +367,7 @@ class Article(models.Model):
     photos = models.ManyToManyField(Photo, related_name='articles', blank=True)  # Galerie optionnelle
 
     class Meta:
+        ordering=['id']
         verbose_name = "Article"
         verbose_name_plural = "Articles"
 
@@ -368,6 +384,7 @@ class Commentaire(models.Model):
     is_active = models.BooleanField(default=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Commentaire"
         verbose_name_plural = "Commentaires"
 
@@ -382,6 +399,7 @@ class Parametre(models.Model):
     date_mise_a_jour = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Paramètre"
         verbose_name_plural = "Paramètres"
 
@@ -401,6 +419,9 @@ class Adresse(models.Model):
     def __str__(self):
         return f"{self.nom} - {self.rue}, {self.ville}"
     
+    class Meta:
+        ordering=['id']
+    
 
 # Modèle Commande
 class Commande(models.Model):
@@ -418,7 +439,9 @@ class Commande(models.Model):
     date_mise_a_jour = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)  # Pour archiver sans supprimer
     adresse = models.ForeignKey(Adresse, on_delete=models.SET_NULL, null=True)
+
     class Meta:
+        ordering=['id']
         verbose_name = "Commande"
         verbose_name_plural = "Commandes"
 
@@ -435,6 +458,7 @@ class LigneCommande(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Ligne de commande"
         verbose_name_plural = "Lignes de commande"
 
@@ -481,6 +505,7 @@ class Wishlist(models.Model):
     date_mise_a_jour = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering=['id']
         verbose_name = "Liste de souhaits"
         verbose_name_plural = "Listes de souhaits"
         unique_together = ('client',)  # Une seule wishlist par client
