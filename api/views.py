@@ -1207,11 +1207,11 @@ class AtelierViewSet(viewsets.ModelViewSet):
         atelier = self.get_object()
         user = request.user
 
-        if not atelier.participants.filter(utilisateur=user.id).exists():
+        if not atelier.participants.filter(utilisateur=user.id, atelier=atelier).exists():
             return Response({'error': 'Vous n’êtes pas inscrit à cet atelier.'}, status=400)
 
         with transaction.atomic():
-            participant=Participant.objects.get(utilisateur=user)
+            participant=Participant.objects.get(utilisateur=user, atelier=atelier)
             participant.delete()
             atelier.places_disponibles += 1
             atelier.save()
