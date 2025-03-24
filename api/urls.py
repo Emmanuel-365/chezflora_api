@@ -40,4 +40,5 @@ urlpatterns = [
     path('ban-user/', UtilisateurViewSet.as_view({'post': 'ban_user'}), name='ban-user'),
     path('parametres/public/', ParametreViewSet.as_view({'get': 'public'}), name='parametres-public'),
     path('change-password/', UtilisateurViewSet.as_view({'post': 'change_password'}), name='change-password'),
+    path('update-profile/', UtilisateurViewSet.as_view({'patch': 'update_profile'}), name='update-profile'),
 ]

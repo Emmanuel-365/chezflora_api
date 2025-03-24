@@ -185,6 +185,22 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
             return Response({'status': 'Utilisateur créé, OTP envoyé par email', 'user_id': user.id}, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=['patch'], permission_classes=[IsAuthenticated])
+    def update_profile(self, request):
+        user = request.user
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        
+        # Limiter les champs modifiables pour les non-admins
+        if request.user.role != 'admin':
+            allowed_fields = {'username', 'email'}
+            for field in request.data.keys():
+                if field not in allowed_fields:
+                    return Response({'error': f'Vous ne pouvez pas modifier le champ {field}'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer.save()
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'], permission_classes=[AllowAny], throttle_classes=[VerifyOTPThrottle])
     def verify_otp(self, request):
         user_id = request.data.get('user_id')
