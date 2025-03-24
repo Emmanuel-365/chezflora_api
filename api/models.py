@@ -35,8 +35,14 @@ class Photo(models.Model):
         verbose_name_plural = "Photos"
 
     def __str__(self):
-        entity = self.produit or self.service or self.realisation
-        return f"Photo pour {entity}"
+        entity = None
+        if hasattr(self, 'produit') and self.produit:
+            entity = str(self.produit)
+        elif hasattr(self, 'service') and self.service:
+            entity = str(self.service)
+        elif hasattr(self, 'realisation') and self.realisation:
+            entity = str(self.realisation)
+        return f"{entity or 'Item inconnu'} (quantité: {self.quantite})"
 
 # Modèle Utilisateur personnalisé
 class Utilisateur(AbstractUser):
