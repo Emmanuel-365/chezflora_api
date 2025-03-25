@@ -29,7 +29,6 @@ class Photo(models.Model):
     produit = models.ForeignKey('Produit', on_delete=models.CASCADE, related_name='photos', null=True, blank=True)
     service = models.ForeignKey('Service', on_delete=models.CASCADE, related_name='photos', null=True, blank=True)
     realisation = models.ForeignKey('Realisation', on_delete=models.CASCADE, related_name='photos', null=True, blank=True)
-    article = models.ForeignKey('article', on_delete=models.CASCADE, related_name='photos', null=True, blank=True)
 
     class Meta:
         verbose_name = "Photo"
@@ -41,8 +40,6 @@ class Photo(models.Model):
             entity = str(self.produit)
         elif hasattr(self, 'service') and self.service:
             entity = str(self.service)
-        elif hasattr(self, 'article') and self.article:
-            entity = str(self.article)
         elif hasattr(self, 'realisation') and self.realisation:
             entity = str(self.realisation)
         return f"{entity or 'Item inconnu'} (quantité: {self.quantite})"

@@ -41,7 +41,6 @@ class PhotoSerializer(serializers.ModelSerializer):
             'produit': Produit,
             'service': Service,
             'realisation': Realisation,
-            'article': Article,
             # Ajoutez d'autres modèles ici si nécessaire
         }
 
@@ -73,8 +72,6 @@ class PhotoSerializer(serializers.ModelSerializer):
             photo = Photo.objects.create(service=entity, **validated_data)
         elif entity_type == 'realisation':
             photo = Photo.objects.create(realisation=entity, **validated_data)
-        elif entity_type == 'article':
-            photo = Photo.objects.create(article=entity, **validated_data)
         return photo
 
     def to_representation(self, instance):
@@ -91,9 +88,6 @@ class PhotoSerializer(serializers.ModelSerializer):
         elif instance.realisation:
             representation['entity_type'] = 'realisation'
             representation['entity_id'] = instance.realisation.id
-        if instance.produit:
-            representation['entity_type'] = 'article'
-            representation['entity_id'] = instance.article.id
         return representation
 
 # Serializer pour Utilisateur
