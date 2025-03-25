@@ -26,8 +26,8 @@ def compress_and_convert_image(image):
     return ContentFile(output.getvalue(), name=image.name.rsplit('.', 1)[0] + '.jpg')
 
 class PhotoSerializer(serializers.ModelSerializer):
-    entity_type = serializers.CharField(write_only=True, required=False)  # "produit", "service", etc.
-    entity_id = serializers.CharField(write_only=True, required=False)    # ID de l'entité
+    entity_type = serializers.CharField(write_only=True)  # "produit", "service", etc.
+    entity_id = serializers.CharField(write_only=True)    # ID de l'entité
 
     class Meta:
         model = Photo
