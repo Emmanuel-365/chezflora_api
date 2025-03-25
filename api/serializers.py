@@ -478,7 +478,7 @@ class CommentaireSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Commentaire
-        fields = ['id', 'article', 'client', 'texte', 'date', 'parent', 'reponses']
+        fields = ['id', 'article', 'client', 'texte', 'date', 'parent', 'reponses', 'ban_reason']
 
     def get_reponses(self, obj):
         reponses = obj.reponses.all()

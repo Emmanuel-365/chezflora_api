@@ -455,15 +455,16 @@ class Article(models.Model):
 
 # Modèle Commentaire
 class Commentaire(models.Model):
-    article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name='commentaires')
+    article = models.ForeignKey('Article', on_delete=models.CASCADE, related_name='commentaires')
     client = models.ForeignKey(Utilisateur, on_delete=models.CASCADE)
     texte = models.TextField()
     date = models.DateTimeField(auto_now_add=True)
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='reponses')
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)  # Visible publiquement ou non
+    ban_reason = models.TextField(null=True, blank=True)  # Raison du bannissement, si applicable
 
     class Meta:
-        ordering=['id']
+        ordering = ['id']
         verbose_name = "Commentaire"
         verbose_name_plural = "Commentaires"
 

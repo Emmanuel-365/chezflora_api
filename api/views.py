@@ -1,6 +1,7 @@
 from datetime import timedelta
 import random
 import string
+import requests
 from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.views import APIView
@@ -1579,7 +1580,45 @@ class ArticleViewSet(viewsets.ModelViewSet):
         }
         return Response(stats_data)   
     
-# ViewSet pour les commentaires (authentification requise)
+def moderate_comment_with_gemini(text):
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    headers = {
+        "Content-Type": "application/json",
+    }
+    data = {
+        "contents": [{
+            "parts": [{
+                "text": f"""
+                Analyse le texte suivant et détermine s'il contient du contenu inapproprié (insultes, langage offensant, spam, etc.).
+                Retourne un objet JSON avec :
+                - "isAppropriate": true/false
+                - "reason": une courte explication si inapproprié
+                Texte à analyser : "{text}"
+                """
+            }]
+        }]
+    }
+    params = {"key": settings.GEMINI_API_KEY}
+
+    try:
+        response = requests.post(url, headers=headers, json=data, params=params)
+        response.raise_for_status()  # Lève une exception pour les erreurs HTTP
+        result = response.json()
+        generated_text = result["candidates"][0]["content"]["parts"][0]["text"]
+        # Nettoyer et parser le JSON (Gemini peut renvoyer du texte brut ou Markdown)
+        import json
+        cleaned_text = generated_text.strip("```json").strip("```").strip()
+        moderation_result = json.loads(cleaned_text)
+        return moderation_result
+    except requests.exceptions.RequestException as e:
+        # En cas d'erreur réseau ou API, accepter par défaut avec un log
+        print(f"Erreur Gemini : {e}")
+        return {"isAppropriate": True, "reason": "Erreur de modération, accepté par défaut"}
+    except (KeyError, json.JSONDecodeError) as e:
+        # En cas d'erreur de parsing, accepter par défaut
+        print(f"Erreur de parsing : {e}")
+        return {"isAppropriate": True, "reason": "Erreur de parsing, accepté par défaut"}
+
 class CommentaireViewSet(viewsets.ModelViewSet):
     serializer_class = CommentaireSerializer
     permission_classes = [AllowAny]
@@ -1587,7 +1626,7 @@ class CommentaireViewSet(viewsets.ModelViewSet):
     filterset_class = CommentaireFilter
     search_fields = ['texte']
     ordering_fields = ['date']
-    pagination_class = StandardResultsSetPagination  # Ajout de la pagination
+    pagination_class = StandardResultsSetPagination
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy', 'moderate']:
@@ -1598,24 +1637,56 @@ class CommentaireViewSet(viewsets.ModelViewSet):
         if getattr(self, 'swagger_fake_view', False):
             return Commentaire.objects.none()
         if self.request.user.is_authenticated and self.request.user.role == 'admin':
-            return Commentaire.objects.all()
-        return Commentaire.objects.filter(is_active=True)
+            return Commentaire.objects.all()  # Les admins voient tous les commentaires
+        return Commentaire.objects.filter(is_active=True)  # Les utilisateurs normaux ne voient que les actifs
 
     def perform_create(self, serializer):
         article_id = self.request.data.get('article')
         parent_id = self.request.data.get('parent')
+        texte = self.request.data.get('texte')
+
+        # Validation côté serveur
+        if not texte or len(texte.strip()) == 0:
+            raise serializers.ValidationError("Le texte du commentaire ne peut pas être vide.")
+        if len(texte) > 500:  # MAX_COMMENT_LENGTH
+            raise serializers.ValidationError("Le commentaire ne peut pas dépasser 500 caractères.")
+        if any(len(word) > 50 for word in texte.split()):  # MAX_WORD_LENGTH
+            raise serializers.ValidationError("Aucun mot ne peut dépasser 50 caractères sans espace.")
+
+        # Modération avec Gemini
+        moderation_result = moderate_comment_with_gemini(texte)
         article = get_object_or_404(Article, id=article_id)
         parent = get_object_or_404(Commentaire, id=parent_id) if parent_id else None
-        serializer.save(client=self.request.user, article=article, parent=parent)
+
+        if not moderation_result['isAppropriate']:
+            # Enregistrer le commentaire comme banni
+            serializer.save(
+                client=self.request.user,
+                article=article,
+                parent=parent,
+                is_active=False,
+                ban_reason=moderation_result['reason']
+            )
+        else:
+            # Enregistrer le commentaire comme actif
+            serializer.save(
+                client=self.request.user,
+                article=article,
+                parent=parent,
+                is_active=True
+            )
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def moderate(self, request, pk=None):
         commentaire = self.get_object()
         is_active = request.data.get('is_active', None)
+        ban_reason = request.data.get('ban_reason', commentaire.ban_reason)
+
         if is_active is None:
             return Response({'error': 'is_active requis'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         commentaire.is_active = is_active
+        commentaire.ban_reason = ban_reason if not is_active else None
         commentaire.save()
         action = 'activé' if is_active else 'désactivé'
         return Response({'status': f'Commentaire {action}'}, status=status.HTTP_200_OK)
@@ -1632,6 +1703,7 @@ class CommentaireViewSet(viewsets.ModelViewSet):
 
         total_comments = Commentaire.objects.count()
         active_comments = Commentaire.objects.filter(is_active=True).count()
+        banned_comments = Commentaire.objects.filter(is_active=False).count()
         comments_by_day = (
             Commentaire.objects
             .filter(date__gte=last_period)
@@ -1651,6 +1723,7 @@ class CommentaireViewSet(viewsets.ModelViewSet):
         stats_data = {
             'total_comments': total_comments,
             'active_comments': active_comments,
+            'banned_comments': banned_comments,
             'comments_by_day': [
                 {'date': item['day'].strftime('%Y-%m-%d'), 'total': item['total']}
                 for item in comments_by_day
@@ -1658,7 +1731,7 @@ class CommentaireViewSet(viewsets.ModelViewSet):
             'top_commenters': list(top_commenters),
         }
         return Response(stats_data)
-        
+
 # ViewSet pour les paramètres (public par défaut, modification admin)
 class ParametreViewSet(viewsets.ModelViewSet):
     """
