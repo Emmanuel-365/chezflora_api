@@ -121,6 +121,14 @@ class Categorie(models.Model):
     def __str__(self):
         return self.nom
 
+
+class UploadedImage(models.Model):
+    image = models.ImageField(upload_to="article_images/")  # Images dans le contenu
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image uploaded at {self.uploaded_at}"
+
 # Modèle Produit
 class Produit(models.Model):
     nom = models.CharField(max_length=100)
@@ -438,7 +446,6 @@ class Article(models.Model):
     date_publication = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
     date_mise_a_jour = models.DateTimeField(auto_now=True)
-    photos = models.ManyToManyField(Photo, related_name='articles', blank=True)  # Galerie optionnelle
 
     class Meta:
         ordering=['id']

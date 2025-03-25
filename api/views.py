@@ -24,7 +24,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
 
 from .models import (
-    Utilisateur, Categorie, Produit, Promotion, Commande, LigneCommande, Panier, PanierProduit, Adresse, Participant,
+    UploadedImage, Utilisateur, Categorie, Produit, Promotion, Commande, LigneCommande, Panier, PanierProduit, Adresse, Participant,
     Devis, Service, Realisation, Abonnement, Atelier, Article, Commentaire, Parametre, Paiement, OTP, Wishlist, Photo
 )
 from .serializers import (
@@ -44,14 +44,18 @@ from django.db.models.functions import TruncDay
 from django.contrib.auth.hashers import check_password, make_password
 
 
-@api_view(['POST'])
-@permission_classes([IsAdminUser])
+@api_view(["POST"])
 def upload_image(request):
-    serializer = PhotoSerializer(data=request.data)
-    if serializer.is_valid():
-        photo = serializer.save()
-        return Response({'url': photo.image.url}, status=201)
-    return Response(serializer.errors, status=400)
+    if "image" not in request.FILES:
+        return Response({"error": "Aucune image fournie"}, status=status.HTTP_400_BAD_REQUEST)
+
+    image_file = request.FILES["image"]
+    uploaded_image = UploadedImage(image=image_file)
+    uploaded_image.save()
+
+    # Construire l'URL complète de l'image
+    image_url = request.build_absolute_uri(uploaded_image.image.url)
+    return Response({"url": image_url}, status=status.HTTP_201_CREATED)
 
 
 class PhotoViewSet(viewsets.ModelViewSet):

@@ -2,7 +2,7 @@ from django.utils import timezone
 from decimal import Decimal
 from rest_framework import serializers
 from .models import (
-    AbonnementProduit, Utilisateur, Categorie, Produit, Promotion, Commande, LigneCommande, Photo,
+    AbonnementProduit, UploadedImage, Utilisateur, Categorie, Produit, Promotion, Commande, LigneCommande, Photo,
     Panier, PanierProduit, Adresse, Devis, Service, Realisation, Abonnement,
     Atelier, Article, Commentaire, Parametre, Paiement, OTP, Wishlist, Participant
 )
@@ -497,6 +497,12 @@ class ArticleSerializer(serializers.ModelSerializer):
         model = Article
         fields = ['id', 'titre', 'contenu', 'date_publication', 'auteur', 'commentaires_ids', 'is_active', 'date_mise_a_jour', 'cover']
         read_only_fields = ['date_publication', 'date_mise_a_jour']
+
+
+class UploadedImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UploadedImage
+        fields = ["id", "image"]
 
 # Serializer pour Parametre
 class ParametreSerializer(serializers.ModelSerializer):
