@@ -247,17 +247,6 @@ class PanierSerializer(serializers.ModelSerializer):
         fields = ['id', 'client', 'client_id', 'items', 'date_creation', 'date_mise_a_jour', 'total']
         read_only_fields = ['date_creation', 'date_mise_a_jour']
 
-# Serializer pour Devis
-class DevisSerializer(serializers.ModelSerializer):
-    # client = UtilisateurSerializer(read_only=True)
-    # client_id = serializers.PrimaryKeyRelatedField(queryset=Utilisateur.objects.filter(role='client'), source='client', write_only=True)
-    service = serializers.PrimaryKeyRelatedField(queryset=Service.objects.all(), read_only=False)
-
-    class Meta:
-        model = Devis
-        fields = ['id', 'service', 'description', 'date_demande', 'statut', 'prix_propose', 'is_active', 'date_mise_a_jour']
-        read_only_fields = ['date_demande', 'date_mise_a_jour']
-
 # Serializer pour Service
 class ServiceSerializer(serializers.ModelSerializer):
     realisations = serializers.PrimaryKeyRelatedField(many=True, read_only=True)  # Liste des réalisations associées
@@ -270,6 +259,55 @@ class ServiceSerializer(serializers.ModelSerializer):
         model = Service
         fields = ['id', 'nom', 'description', 'photos', 'photo_ids', 'realisations', 'is_active', 'date_creation']
         read_only_fields = ['date_creation']
+
+
+class DevisSerializer(serializers.ModelSerializer):
+    service = ServiceSerializer(read_only=True)
+    service_id = serializers.PrimaryKeyRelatedField(
+        queryset=Service.objects.filter(is_active=True),
+        source='service',
+        write_only=True,
+        required=True
+    )
+    client_username = serializers.CharField(source='client.username', read_only=True)
+
+    class Meta:
+        model = Devis
+        fields = [
+            'id',
+            'client_username',
+            'service',
+            'service_id',
+            'description',
+            'date_creation',
+            'date_soumission',
+            'date_expiration',
+            'statut',
+            'prix_demande',
+            'prix_propose',
+            'commentaire_admin',
+            'date_mise_a_jour',
+            'is_active',
+        ]
+        read_only_fields = ['date_creation', 'date_mise_a_jour', 'date_soumission', 'client_username']
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        # Convertir les prix en chaînes pour éviter les problèmes de précision
+        if representation['prix_demande'] is not None:
+            representation['prix_demande'] = str(representation['prix_demande'])
+        if representation['prix_propose'] is not None:
+            representation['prix_propose'] = str(representation['prix_propose'])
+        return representation
+
+    def validate(self, data):
+        """Validation personnalisée."""
+        if 'prix_demande' in data and data['prix_demande'] < 0:
+            raise serializers.ValidationError({"prix_demande": "Le prix demandé ne peut pas être négatif."})
+        if 'prix_propose' in data and data['prix_propose'] < 0:
+            raise serializers.ValidationError({"prix_propose": "Le prix proposé ne peut pas être négatif."})
+        return data
+
 
 # Serializer pour Realisation
 class RealisationSerializer(serializers.ModelSerializer):

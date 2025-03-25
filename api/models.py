@@ -200,26 +200,97 @@ class PanierProduit(models.Model):
 # Modèle Devis
 class Devis(models.Model):
     STATUTS = [
-        ('en_attente', 'En attente'),
-        ('accepte', 'Accepté'),
-        ('refuse', 'Refusé'),
+        ('brouillon', 'Brouillon'),  # Devis en cours de création par le client
+        ('soumis', 'Soumis'),       # Devis envoyé à l'admin
+        ('en_cours', 'En cours'),   # En cours de traitement par l'admin
+        ('accepte', 'Accepté'),     # Accepté par l'admin ou le client
+        ('refuse', 'Refusé'),       # Refusé par l'admin ou le client
+        ('expire', 'Expiré'),       # Devis non répondu après un délai
     ]
-    client = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='devis', limit_choices_to={'role': 'client'})
-    service = models.ForeignKey('Service', on_delete=models.CASCADE, related_name='devis')
-    description = models.TextField()
-    date_demande = models.DateTimeField(auto_now_add=True)
-    statut = models.CharField(max_length=20, choices=STATUTS, default='en_attente')
-    prix_propose = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
-    date_mise_a_jour = models.DateTimeField(auto_now=True)
-    is_active = models.BooleanField(default=True)
+
+    client = models.ForeignKey(
+        'Utilisateur',
+        on_delete=models.CASCADE,
+        related_name='devis',
+        limit_choices_to={'role': 'client'}
+    )
+    service = models.ForeignKey(
+        'Service',
+        on_delete=models.CASCADE,
+        related_name='devis'
+    )
+    description = models.TextField(
+        help_text="Description détaillée de la demande du client."
+    )
+    date_creation = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Date de création du devis."
+    )
+    date_soumission = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date de soumission à l'admin."
+    )
+    date_expiration = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Date limite pour accepter/refuser le devis."
+    )
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUTS,
+        default='brouillon',
+        help_text="État actuel du devis."
+    )
+    prix_demande = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text="Prix demandé par le client (facultatif)."
+    )
+    prix_propose = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        help_text="Prix proposé par l'admin."
+    )
+    commentaire_admin = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Commentaire ou justification de l'admin (ex. raison du refus)."
+    )
+    date_mise_a_jour = models.DateTimeField(
+        auto_now=True,
+        help_text="Dernière mise à jour du devis."
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Indique si le devis est actif ou archivé."
+    )
 
     class Meta:
-        ordering=['id']
+        ordering = ['-date_creation']  # Les plus récents en premier
         verbose_name = "Devis"
         verbose_name_plural = "Devis"
 
     def __str__(self):
-        return f"Devis #{self.id} - {self.client} pour {self.service}"
+        return f"Devis #{self.id} - {self.client.username} pour {self.service.nom}"
+
+    def calculer_expiration(self):
+        """Calcule la date d'expiration (par défaut : 30 jours après soumission)."""
+        if self.date_soumission:
+            return self.date_soumission + timezone.timedelta(days=30)
+        return None
+
+    def verifier_expiration(self):
+        """Met à jour le statut à 'expire' si la date d'expiration est dépassée."""
+        if self.date_expiration and timezone.now() > self.date_expiration and self.statut not in ['accepte', 'refuse']:
+            self.statut = 'expire'
+            self.save()
 
 # Modèle Service
 class Service(models.Model):

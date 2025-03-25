@@ -934,15 +934,15 @@ class PanierViewSet(viewsets.ModelViewSet):
 # ViewSet pour les devis (authentification requise)
 class DevisViewSet(viewsets.ModelViewSet):
     """
-    ViewSet pour les devis. Nécessite une authentification.
+    ViewSet pour la gestion des devis dans une application de production.
     """
     serializer_class = DevisSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = DevisFilter
-    search_fields = ['description']
-    ordering_fields = ['date_demande']
-    pagination_class = StandardResultsSetPagination  # Ajouté
+    search_fields = ['description', 'service__nom', 'client__username']
+    ordering_fields = ['date_creation', 'date_soumission', 'statut', 'prix_propose']
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         if getattr(self, 'swagger_fake_view', False):
@@ -952,38 +952,143 @@ class DevisViewSet(viewsets.ModelViewSet):
         return Devis.objects.filter(client=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(client=self.request.user)
+        """Création d’un devis en brouillon."""
+        devis = serializer.save(client=self.request.user)
+        if devis.statut == 'soumis':
+            self._soumettre_devis(devis)
 
     def perform_update(self, serializer):
+        """Mise à jour d’un devis avec gestion des transitions."""
         devis = serializer.save()
-        if 'prix_propose' in serializer.validated_data or 'statut' in serializer.validated_data:
-            subject = 'Réponse à votre devis - ChezFlora'
-            html_message = render_to_string('devis_reponse_email.html', {
-                'client_name': devis.client.username,
-                'service': devis.service.nom,
-                'prix_propose': devis.prix_propose or 'N/A',
-                'statut': devis.statut,
-            })
-            plain_message = strip_tags(html_message)
-            send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [devis.client.email], html_message=html_message)
+        if 'statut' in serializer.validated_data:
+            if devis.statut == 'soumis' and devis.date_soumission is None:
+                self._soumettre_devis(devis)
+            elif devis.statut in ['accepte', 'refuse']:
+                self._notifier_client(devis)
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
-    def proposer_prix(self, request, pk=None):
-        devis = self.get_object()
-        prix_propose = request.data.get('prix_propose')
-        statut = request.data.get('statut', 'en_attente')
-
-        if prix_propose is None:
-            return Response({'error': 'Le prix proposé est requis.'}, status=400)
-
-        devis.prix_propose = Decimal(prix_propose)
-        devis.statut = statut if statut in ['accepte', 'refuse'] else 'en_attente'
+    def _soumettre_devis(self, devis):
+        """Logique pour soumettre un devis."""
+        devis.date_soumission = timezone.now()
+        devis.date_expiration = devis.calculer_expiration()
+        devis.statut = 'soumis'
         devis.save()
 
-        # Simulation d'une notification (à remplacer par un vrai système d'email/notification)
-        print(f"Notification à {devis.client.email}: Votre devis pour {devis.service.nom} a été mis à jour à {prix_propose}€ - Statut: {devis.statut}")
+        # Notification aux admins
+        admins = Utilisateur.objects.filter(role='admin')
+        subject = 'Nouveau devis soumis - ChezFlora'
+        html_message = render_to_string('devis_nouveau_email.html', {
+            'client_name': devis.client.username,
+            'service': devis.service.nom,
+            'description': devis.description,
+            'prix_demande': devis.prix_demande or 'Non spécifié',
+            'devis_id': devis.id,
+        })
+        plain_message = strip_tags(html_message)
+        for admin in admins:
+            send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [admin.email], html_message=html_message)
 
-        return Response({'status': 'Prix proposé et statut mis à jour', 'devis_id': devis.id})
+    def _notifier_client(self, devis):
+        """Notifie le client lors d’une mise à jour importante."""
+        subject = f"Votre devis #{devis.id} - Mise à jour"
+        html_message = render_to_string('devis_reponse_email.html', {
+            'client_name': devis.client.username,
+            'service': devis.service.nom,
+            'prix_propose': devis.prix_propose or 'Non spécifié',
+            'statut': devis.get_statut_display(),
+            'commentaire_admin': devis.commentaire_admin or 'Aucun commentaire',
+        })
+        plain_message = strip_tags(html_message)
+        send_mail(subject, plain_message, 'ChezFlora <plazarecrute@gmail.com>', [devis.client.email], html_message=html_message)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def soumettre(self, request, pk=None):
+        """Action pour soumettre un devis (client)."""
+        devis = self.get_object()
+        if devis.client != self.request.user:
+            return Response({'error': 'Vous ne pouvez soumettre que vos propres devis.'}, status=status.HTTP_403_FORBIDDEN)
+        if devis.statut != 'brouillon':
+            return Response({'error': 'Ce devis a déjà été soumis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        devis.statut = 'soumis'
+        self._soumettre_devis(devis)
+        return Response({'status': 'Devis soumis avec succès', 'devis_id': devis.id}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def proposer_reponse(self, request, pk=None):
+        """Action pour qu’un admin propose une réponse (prix, statut, commentaire)."""
+        devis = self.get_object()
+        prix_propose = request.data.get('prix_propose')
+        statut = request.data.get('statut')
+        commentaire_admin = request.data.get('commentaire_admin')
+
+        # Validation
+        if statut not in ['en_cours', 'accepte', 'refuse']:
+            return Response({'error': 'Statut invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+        if prix_propose is not None:
+            try:
+                prix_propose = Decimal(prix_propose)
+                if prix_propose < 0:
+                    return Response({'error': 'Le prix proposé ne peut pas être négatif.'}, status=status.HTTP_400_BAD_REQUEST)
+            except (ValueError, TypeError):
+                return Response({'error': 'Prix proposé invalide.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mise à jour
+        devis.prix_propose = prix_propose if prix_propose is not None else devis.prix_propose
+        devis.statut = statut
+        devis.commentaire_admin = commentaire_admin or devis.commentaire_admin
+        devis.verifier_expiration()  # Vérifie si le devis est expiré avant mise à jour
+        devis.save()
+
+        self._notifier_client(devis)
+        return Response({
+            'status': 'Réponse enregistrée',
+            'devis_id': devis.id,
+            'prix_propose': str(devis.prix_propose) if devis.prix_propose else None,
+            'statut': devis.statut,
+            'commentaire_admin': devis.commentaire_admin,
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def accepter(self, request, pk=None):
+        """Action pour qu’un client accepte un devis."""
+        devis = self.get_object()
+        if devis.client != self.request.user:
+            return Response({'error': 'Vous ne pouvez accepter que vos propres devis.'}, status=status.HTTP_403_FORBIDDEN)
+        if devis.statut not in ['en_cours', 'accepte']:
+            return Response({'error': 'Ce devis ne peut pas être accepté.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        devis.statut = 'accepte'
+        devis.save()
+        self._notifier_client(devis)
+        # TODO : Lancer une action comme créer une commande ou un paiement
+        return Response({'status': 'Devis accepté', 'devis_id': devis.id}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def refuser(self, request, pk=None):
+        """Action pour qu’un client refuse un devis."""
+        devis = self.get_object()
+        if devis.client != self.request.user:
+            return Response({'error': 'Vous ne pouvez refuser que vos propres devis.'}, status=status.HTTP_403_FORBIDDEN)
+        if devis.statut not in ['en_cours', 'accepte']:
+            return Response({'error': 'Ce devis ne peut pas être refusé.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        devis.statut = 'refuse'
+        devis.save()
+        self._notifier_client(devis)
+        return Response({'status': 'Devis refusé', 'devis_id': devis.id}, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAdminUser])
+    def statistiques(self, request):
+        """Statistiques sur les devis pour les admins."""
+        total_devis = Devis.objects.count()
+        devis_par_statut = Devis.objects.values('statut').annotate(count=models.Count('id'))
+        moyenne_prix_propose = Devis.objects.filter(prix_propose__isnull=False).aggregate(avg=models.Avg('prix_propose'))['avg'] or 0
+
+        return Response({
+            'total_devis': total_devis,
+            'devis_par_statut': list(devis_par_statut),
+            'moyenne_prix_propose': str(moyenne_prix_propose),
+        })
 
 # ViewSet pour les services (public par défaut)
 class ServiceViewSet(viewsets.ModelViewSet):
