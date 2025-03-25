@@ -144,7 +144,6 @@ class Produit(models.Model):
     # La relation avec Photo est gérée via related_name='photos'
 
     class Meta:
-        ordering=['id']
         verbose_name = "Produit"
         verbose_name_plural = "Produits"
 
@@ -167,7 +166,6 @@ class Promotion(models.Model):
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering=['id']
         verbose_name = "Promotion"
         verbose_name_plural = "Promotions"
 
