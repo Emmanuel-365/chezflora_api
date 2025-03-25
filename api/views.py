@@ -1,4 +1,5 @@
 from datetime import timedelta
+import json
 import random
 import string
 import requests
@@ -1580,6 +1581,8 @@ class ArticleViewSet(viewsets.ModelViewSet):
         }
         return Response(stats_data)   
     
+import re
+
 def moderate_comment_with_gemini(text):
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
     headers = {
@@ -1605,19 +1608,24 @@ def moderate_comment_with_gemini(text):
         response.raise_for_status()  # Lève une exception pour les erreurs HTTP
         result = response.json()
         generated_text = result["candidates"][0]["content"]["parts"][0]["text"]
-        # Nettoyer et parser le JSON (Gemini peut renvoyer du texte brut ou Markdown)
-        import json
-        cleaned_text = generated_text.strip("```json").strip("```").strip()
-        moderation_result = json.loads(cleaned_text)
+        
+        # Extraire le JSON contenu dans les balises Markdown
+        match = re.search(r'```json\n(.*?)\n```', generated_text, re.DOTALL)
+        if match:
+            cleaned_text = match.group(1).strip()
+            moderation_result = json.loads(cleaned_text)
+        else:
+            # Si le format n'est pas celui attendu, retour par défaut
+            moderation_result = {"isAppropriate": True, "reason": "Format de réponse invalide"}
+        
         return moderation_result
     except requests.exceptions.RequestException as e:
-        # En cas d'erreur réseau ou API, accepter par défaut avec un log
         print(f"Erreur Gemini : {e}")
         return {"isAppropriate": True, "reason": "Erreur de modération, accepté par défaut"}
     except (KeyError, json.JSONDecodeError) as e:
-        # En cas d'erreur de parsing, accepter par défaut
         print(f"Erreur de parsing : {e}")
         return {"isAppropriate": True, "reason": "Erreur de parsing, accepté par défaut"}
+
 
 class CommentaireViewSet(viewsets.ModelViewSet):
     serializer_class = CommentaireSerializer
