@@ -27,7 +27,7 @@ SECRET_KEY = "django-insecure-+1okhughn%s^+=fkn2bd^*3c$%ozs&rg2&$i7$5e-(9@*)mt#^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', 'chezflora-api.onrender.com']
+ALLOWED_HOSTS = ['localhost', 'chezflora-api.onrender.com', '127.0.0.1']
 
 
 # Application definition
@@ -191,6 +191,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/5.1/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
+DEFAULT_CHARSET = 'utf-8'  # Ceci devrait être présent implicitement
+FILE_CHARSET = 'utf-8'     # Pour les fichiers lus par Django
 
 TIME_ZONE = "UTC"
 
