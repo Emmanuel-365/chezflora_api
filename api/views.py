@@ -2,7 +2,7 @@ from datetime import timedelta
 import random
 import string
 from rest_framework import viewsets, status, serializers
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
@@ -42,6 +42,17 @@ from .exceptions import BannedUserException
 from django.conf import settings
 from django.db.models.functions import TruncDay
 from django.contrib.auth.hashers import check_password, make_password
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def upload_image(request):
+    serializer = PhotoSerializer(data=request.data)
+    if serializer.is_valid():
+        photo = serializer.save()
+        return Response({'url': photo.image.url}, status=201)
+    return Response(serializer.errors, status=400)
+
 
 class PhotoViewSet(viewsets.ModelViewSet):
     queryset = Photo.objects.all()

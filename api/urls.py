@@ -4,7 +4,7 @@ from .views import (
     ContactView, PhotoViewSet, UtilisateurViewSet, CategorieViewSet, ProduitViewSet, PromotionViewSet, CommandeViewSet,
     LigneCommandeViewSet, PanierViewSet, DevisViewSet, ServiceViewSet, RealisationViewSet,
     AbonnementViewSet, AtelierViewSet, ArticleViewSet, CommentaireViewSet, ParametreViewSet,
-    PaiementViewSet, AdresseViewSet, WishlistViewSet
+    PaiementViewSet, AdresseViewSet, WishlistViewSet, upload_image
 )
 import sys
 
@@ -41,4 +41,5 @@ urlpatterns = [
     path('parametres/public/', ParametreViewSet.as_view({'get': 'public'}), name='parametres-public'),
     path('change-password/', UtilisateurViewSet.as_view({'post': 'change_password'}), name='change-password'),
     path('update-profile/', UtilisateurViewSet.as_view({'patch': 'update_profile'}), name='update-profile'),
+    path('upload-image/', upload_image, name='upload-image'),
 ]
