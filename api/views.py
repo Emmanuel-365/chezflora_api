@@ -924,6 +924,7 @@ class PanierViewSet(viewsets.ModelViewSet):
                 )
             commande.total = total
             commande.adresse = adresse  # Ajout de l'adresse à la commande
+            commande.statut = 'en_cours'
             commande.save()
             Paiement.objects.create(commande=commande, type_transaction='commande', montant=total)
             panier.items.all().delete()
